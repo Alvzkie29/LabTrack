@@ -1,6 +1,5 @@
 using System.Text;
 using LabTrack.Api.Data;
-using LabTrack.Api.Hubs;
 using LabTrack.Api.Models;
 using LabTrack.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -142,6 +141,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHub<PresenceHub>("/hubs/presence");
 
 app.Run();

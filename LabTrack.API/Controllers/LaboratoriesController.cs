@@ -16,7 +16,7 @@ public class CreateLaboratoryDto
 public class CreateWorkstationDto
 {
     public int LabId { get; set; }
-    public string DeviceIdentifier { get; set; } = string.Empty;
+    public string PcIdentifier { get; set; } = string.Empty;
     public string SeatLabel { get; set; } = string.Empty;
 }
 
@@ -28,7 +28,6 @@ public class LaboratoriesController : ControllerBase
     private readonly ApplicationDbContext _db;
     public LaboratoriesController(ApplicationDbContext db) => _db = db;
 
-    /// <summary>Lists all labs with their workstations — the data source for the blueprint picker view.</summary>
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -47,32 +46,6 @@ public class LaboratoriesController : ControllerBase
         return Ok(labs);
     }
 
-    /// <summary>Full blueprint for one lab — every workstation's live status, for the internet-café-style view.</summary>
-    [HttpGet("{id:int}/blueprint")]
-    public async Task<IActionResult> GetBlueprint(int id)
-    {
-        var lab = await _db.Laboratories
-            .Where(l => l.LabId == id)
-            .Select(l => new
-            {
-                l.LabId,
-                l.Name,
-                l.RoomCode,
-                l.Capacity,
-                Workstations = l.Workstations.Select(w => new
-                {
-                    w.WorkstationId,
-                    w.SeatLabel,
-                    w.DeviceIdentifier,
-                    Status = w.Status.ToString(),
-                    w.LastHeartbeat
-                })
-            })
-            .FirstOrDefaultAsync();
-
-        return lab is null ? NotFound() : Ok(lab);
-    }
-
     [HttpPost]
     [Authorize(Roles = "Administrator")]
     public async Task<IActionResult> Create(CreateLaboratoryDto dto)
@@ -87,7 +60,7 @@ public class LaboratoriesController : ControllerBase
         _db.Laboratories.Add(lab);
         await _db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetBlueprint), new { id = lab.LabId },
+        return CreatedAtAction(nameof(GetAll), new { },
             new { lab.LabId, lab.Name, lab.RoomCode, lab.Capacity, lab.IsActive });
     }
 
@@ -113,7 +86,6 @@ public class LaboratoriesController : ControllerBase
         var lab = await _db.Laboratories.FindAsync(id);
         if (lab is null) return NotFound();
 
-        // Soft delete — keeps history for any AttendanceSessions/AuditLogs referencing its workstations.
         lab.IsActive = false;
         await _db.SaveChangesAsync();
         return NoContent();
@@ -147,14 +119,14 @@ public class WorkstationsController : ControllerBase
         if (seatTaken)
             return BadRequest($"Seat '{dto.SeatLabel}' is already assigned to another workstation in this lab.");
 
-        var deviceIdTaken = await _db.Workstations.AnyAsync(w => w.DeviceIdentifier == dto.DeviceIdentifier);
-        if (deviceIdTaken)
-            return BadRequest($"Device identifier '{dto.DeviceIdentifier}' is already in use.");
+        var pcIdTaken = await _db.Workstations.AnyAsync(w => w.PcIdentifier == dto.PcIdentifier);
+        if (pcIdTaken)
+            return BadRequest($"PC identifier '{dto.PcIdentifier}' is already in use.");
 
         var ws = new Workstation
         {
             LabId = dto.LabId,
-            DeviceIdentifier = dto.DeviceIdentifier,
+            PcIdentifier = dto.PcIdentifier,
             SeatLabel = dto.SeatLabel
         };
 
@@ -162,6 +134,6 @@ public class WorkstationsController : ControllerBase
         await _db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(Get), new { id = ws.WorkstationId },
-            new { ws.WorkstationId, ws.LabId, ws.DeviceIdentifier, ws.SeatLabel, Status = ws.Status.ToString() });
+            new { ws.WorkstationId, ws.LabId, ws.PcIdentifier, ws.SeatLabel, ws.IsActive });
     }
 }

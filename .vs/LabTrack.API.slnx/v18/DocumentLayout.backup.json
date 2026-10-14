@@ -3,84 +3,20 @@
   "WorkspaceRootPath": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\attendancesessionscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\attendancesessionscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\dtos\\authdtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\dtos\\authdtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\userscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\userscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\migrations\\20260830152002_addsessionreview.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\migrations\\20260830152002_addsessionreview.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\data\\applicationdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\data\\applicationdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\models\\attendancesession.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\models\\attendancesession.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\models\\laboratoriesandworkstations.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\models\\laboratoriesandworkstations.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\coursesectionscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\coursesectionscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\models\\coursesection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\models\\coursesection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\hubs\\presencehub.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\hubs\\presencehub.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\subjectscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\subjectscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\laboratoriescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\laboratoriescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\academicyearscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\academicyearscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\activityscorescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\activityscorescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\remedialandauditcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\remedialandauditcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\controllers\\sessionconfirmationscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\controllers\\sessionconfirmationscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\labtrack.api.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\labtrack.api.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\services\\activityscoringservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\services\\activityscoringservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\models\\applicationuser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\models\\applicationuser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\services\\tokenservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -89,10 +25,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\data\\dbseeder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\data\\dbseeder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\models\\coursesection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\models\\coursesection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\migrations\\20260815070623_initialcreate.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -109,14 +41,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\models\\chedcomplianceprogress.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\models\\chedcomplianceprogress.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\models\\applicationuser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\models\\applicationuser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|c:\\users\\chrono\\projects\\labtrack.api\\labtrack.api\\migrations\\20260821054343_uniqueseatperlab.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A7AC8B0D-EDD1-E130-0F02-46D297F9694E}|LabTrack.API\\LabTrack.API.csproj|solutionrelative:labtrack.api\\migrations\\20260821054343_uniqueseatperlab.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -126,320 +50,67 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 6,
+          "SelectedChildIndex": 1,
           "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "LaboratoriesAndWorkstations.cs",
+              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\LaboratoriesAndWorkstations.cs",
+              "RelativeDocumentMoniker": "LabTrack.API\\Models\\LaboratoriesAndWorkstations.cs",
+              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\LaboratoriesAndWorkstations.cs",
+              "RelativeToolTip": "LabTrack.API\\Models\\LaboratoriesAndWorkstations.cs",
+              "ViewState": "AgIAACcAAAAAAAAAAAAiwC0AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T16:24:09.328Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ApplicationDbContext.cs",
+              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Data\\ApplicationDbContext.cs",
+              "RelativeDocumentMoniker": "LabTrack.API\\Data\\ApplicationDbContext.cs",
+              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Data\\ApplicationDbContext.cs",
+              "RelativeToolTip": "LabTrack.API\\Data\\ApplicationDbContext.cs",
+              "ViewState": "AgIAADIAAAAAAAAAAAAQwDsAAAAfAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T16:17:51.701Z",
+              "EditorCaption": ""
+            },
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "CourseSectionsController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\CourseSectionsController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\CourseSectionsController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\CourseSectionsController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\CourseSectionsController.cs",
-              "ViewState": "AgIAAJ4AAAAAAAAAAAAAAKQAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-16T08:02:26.797Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "AttendanceSession.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\AttendanceSession.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Models\\AttendanceSession.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\AttendanceSession.cs",
-              "RelativeToolTip": "LabTrack.API\\Models\\AttendanceSession.cs",
-              "ViewState": "AgIAACEAAAAAAAAAAADwvykAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T06:32:17.987Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "ApplicationDbContext.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Data\\ApplicationDbContext.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Data\\ApplicationDbContext.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Data\\ApplicationDbContext.cs",
-              "RelativeToolTip": "LabTrack.API\\Data\\ApplicationDbContext.cs",
-              "ViewState": "AgIAAJUAAAAAAAAAAAAQwKgAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T06:40:17.796Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "AuthDtos.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\DTOs\\AuthDtos.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\DTOs\\AuthDtos.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\DTOs\\AuthDtos.cs",
-              "RelativeToolTip": "LabTrack.API\\DTOs\\AuthDtos.cs",
-              "ViewState": "AgIAADAAAAAAAAAAAAA2wDoAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T07:23:58.801Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "AuthController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\AuthController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\AuthController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\AuthController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\AuthController.cs",
-              "ViewState": "AgIAAJcAAAAAAAAAAAAQwKoAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T07:24:31.074Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "AttendanceSessionsController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\AttendanceSessionsController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\AttendanceSessionsController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\AttendanceSessionsController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\AttendanceSessionsController.cs",
-              "ViewState": "AgIAAO0AAAAAAAAAAAAYwPUAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-16T08:05:45.208Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "UsersController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\UsersController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\UsersController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\UsersController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\UsersController.cs",
-              "ViewState": "AgIAAAkAAAAAAAAAAAAAAGoAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-01T07:13:09.939Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "PresenceHub.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Hubs\\PresenceHub.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Hubs\\PresenceHub.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Hubs\\PresenceHub.cs",
-              "RelativeToolTip": "LabTrack.API\\Hubs\\PresenceHub.cs",
-              "ViewState": "AgIAACsAAAAAAAAAAAAAwGEAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T06:58:35.152Z"
-            },
-            {
-              "$type": "Document",
               "DocumentIndex": 4,
-              "Title": "20260830152002_AddSessionReview.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Migrations\\20260830152002_AddSessionReview.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Migrations\\20260830152002_AddSessionReview.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Migrations\\20260830152002_AddSessionReview.cs",
-              "RelativeToolTip": "LabTrack.API\\Migrations\\20260830152002_AddSessionReview.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-30T15:20:02.741Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 9,
-              "Title": "appsettings.json",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\appsettings.json",
-              "RelativeDocumentMoniker": "LabTrack.API\\appsettings.json",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\appsettings.json",
-              "RelativeToolTip": "LabTrack.API\\appsettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAADwvxQAAAAcAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-08-15T05:08:30.133Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 12,
-              "Title": "SubjectsController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\SubjectsController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\SubjectsController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\SubjectsController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\SubjectsController.cs",
-              "ViewState": "AgIAAE0AAAAAAAAAAAAYwFwAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T08:16:10.404Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 13,
-              "Title": "LaboratoriesController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\LaboratoriesController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\LaboratoriesController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\LaboratoriesController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\LaboratoriesController.cs",
-              "ViewState": "AgIAAJMAAAAAAAAAAAAQwJwAAAA0AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T08:15:00.281Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 14,
-              "Title": "AcademicYearsController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\AcademicYearsController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\AcademicYearsController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\AcademicYearsController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\AcademicYearsController.cs",
-              "ViewState": "AgIAADAAAAAAAAAAAAAQwEMAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T08:15:41.617Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 11,
-              "Title": "launchSettings.json",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Properties\\launchSettings.json",
-              "RelativeDocumentMoniker": "LabTrack.API\\Properties\\launchSettings.json",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Properties\\launchSettings.json",
-              "RelativeToolTip": "LabTrack.API\\Properties\\launchSettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAwAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-08-15T07:16:37.53Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 10,
-              "Title": "Program.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Program.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Program.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Program.cs",
-              "RelativeToolTip": "LabTrack.API\\Program.cs",
-              "ViewState": "AgIAABgAAAAAAAAAAAAAAJIAAAAKAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T05:08:46.357Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 17,
-              "Title": "SessionConfirmationsController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\SessionConfirmationsController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\SessionConfirmationsController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\SessionConfirmationsController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\SessionConfirmationsController.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAIYAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-16T08:04:18.552Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 28,
-              "Title": "20260821054343_UniqueSeatPerLab.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Migrations\\20260821054343_UniqueSeatPerLab.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Migrations\\20260821054343_UniqueSeatPerLab.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Migrations\\20260821054343_UniqueSeatPerLab.cs",
-              "RelativeToolTip": "LabTrack.API\\Migrations\\20260821054343_UniqueSeatPerLab.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-21T05:43:43.327Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 15,
-              "Title": "ActivityScoresController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\ActivityScoresController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\ActivityScoresController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\ActivityScoresController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\ActivityScoresController.cs",
-              "ViewState": "AgIAABIAAAAAAAAAAAAuwD0AAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-16T08:10:00.123Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 16,
-              "Title": "RemedialAndAuditController.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\RemedialAndAuditController.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Controllers\\RemedialAndAuditController.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Controllers\\RemedialAndAuditController.cs",
-              "RelativeToolTip": "LabTrack.API\\Controllers\\RemedialAndAuditController.cs",
-              "ViewState": "AgIAAGsAAAAAAAAAAAAkwHQAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-16T08:09:22.021Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 18,
-              "Title": "LabTrack.API.csproj",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\LabTrack.API.csproj",
-              "RelativeDocumentMoniker": "LabTrack.API\\LabTrack.API.csproj",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\LabTrack.API.csproj",
-              "RelativeToolTip": "LabTrack.API\\LabTrack.API.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2026-08-15T07:23:24.001Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 19,
-              "Title": "ActivityScoringService.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Services\\ActivityScoringService.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Services\\ActivityScoringService.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Services\\ActivityScoringService.cs",
-              "RelativeToolTip": "LabTrack.API\\Services\\ActivityScoringService.cs",
-              "ViewState": "AgIAADYAAAAAAAAAAAAUwEoAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T06:57:24.093Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 20,
               "Title": "TokenService.cs",
               "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Services\\TokenService.cs",
               "RelativeDocumentMoniker": "LabTrack.API\\Services\\TokenService.cs",
               "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Services\\TokenService.cs",
               "RelativeToolTip": "LabTrack.API\\Services\\TokenService.cs",
-              "ViewState": "AgIAABoAAAAAAAAAAADwvy4AAAABAAAAAAAAAA==",
+              "ViewState": "AgIAABoAAAAAAAAAAADwvxoAAAA2AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T06:55:31.823Z"
+              "WhenOpened": "2026-08-15T06:55:31.823Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 21,
-              "Title": "DbSeeder.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Data\\DbSeeder.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Data\\DbSeeder.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Data\\DbSeeder.cs",
-              "RelativeToolTip": "LabTrack.API\\Data\\DbSeeder.cs",
-              "ViewState": "AgIAABYAAAAAAAAAAAAQwCcAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T06:54:44.191Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 22,
+              "DocumentIndex": 2,
               "Title": "CourseSection.cs",
               "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\CourseSection.cs",
               "RelativeDocumentMoniker": "LabTrack.API\\Models\\CourseSection.cs",
               "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\CourseSection.cs",
               "RelativeToolTip": "LabTrack.API\\Models\\CourseSection.cs",
-              "ViewState": "AgIAABcAAAAAAAAAAAAswB4AAAABAAAAAAAAAA==",
+              "ViewState": "AgIAACEAAAAAAAAAAAAwwCgAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T06:24:37.681Z"
+              "WhenOpened": "2026-08-15T06:24:37.681Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 23,
-              "Title": "20260815070623_InitialCreate.cs",
-              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Migrations\\20260815070623_InitialCreate.cs",
-              "RelativeDocumentMoniker": "LabTrack.API\\Migrations\\20260815070623_InitialCreate.cs",
-              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Migrations\\20260815070623_InitialCreate.cs",
-              "RelativeToolTip": "LabTrack.API\\Migrations\\20260815070623_InitialCreate.cs",
-              "ViewState": "AgIAADQCAAAAAAAAAAAAAGIAAAApAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T07:06:24.152Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 24,
+              "DocumentIndex": 7,
               "Title": "AuditLog.cs",
               "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\AuditLog.cs",
               "RelativeDocumentMoniker": "LabTrack.API\\Models\\AuditLog.cs",
@@ -451,7 +122,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 25,
+              "DocumentIndex": 8,
               "Title": "ActivityScore.cs",
               "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\ActivityScore.cs",
               "RelativeDocumentMoniker": "LabTrack.API\\Models\\ActivityScore.cs",
@@ -463,7 +134,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 26,
+              "DocumentIndex": 9,
               "Title": "ChedComplianceProgress.cs",
               "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\ChedComplianceProgress.cs",
               "RelativeDocumentMoniker": "LabTrack.API\\Models\\ChedComplianceProgress.cs",
@@ -475,15 +146,40 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 27,
+              "DocumentIndex": 3,
               "Title": "ApplicationUser.cs",
               "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\ApplicationUser.cs",
               "RelativeDocumentMoniker": "LabTrack.API\\Models\\ApplicationUser.cs",
               "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Models\\ApplicationUser.cs",
               "RelativeToolTip": "LabTrack.API\\Models\\ApplicationUser.cs",
-              "ViewState": "AgIAAA8AAAAAAAAAAAA+wBYAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAABEAAAAAAAAAAAAiwCUAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-15T05:18:50.393Z"
+              "WhenOpened": "2026-08-15T05:18:50.393Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "20260815070623_InitialCreate.cs",
+              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Migrations\\20260815070623_InitialCreate.cs",
+              "RelativeDocumentMoniker": "LabTrack.API\\Migrations\\20260815070623_InitialCreate.cs",
+              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Migrations\\20260815070623_InitialCreate.cs",
+              "RelativeToolTip": "LabTrack.API\\Migrations\\20260815070623_InitialCreate.cs",
+              "ViewState": "AgIAADQCAAAAAAAAAAAAAGIAAAApAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-15T07:06:24.152Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "DbSeeder.cs",
+              "DocumentMoniker": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Data\\DbSeeder.cs",
+              "RelativeDocumentMoniker": "LabTrack.API\\Data\\DbSeeder.cs",
+              "ToolTip": "C:\\Users\\Chrono\\Projects\\LabTrack.API\\LabTrack.API\\Data\\DbSeeder.cs",
+              "RelativeToolTip": "LabTrack.API\\Data\\DbSeeder.cs",
+              "ViewState": "AgIAABYAAAAAAAAAAAAQwCcAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-15T06:54:44.191Z"
             }
           ]
         }

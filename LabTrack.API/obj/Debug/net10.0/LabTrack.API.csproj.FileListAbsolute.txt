@@ -216,3 +216,4 @@ C:\Users\Chrono\Projects\LabTrack.API\LabTrack.API\obj\Debug\net10.0\refint\LabT
 C:\Users\Chrono\Projects\LabTrack.API\LabTrack.API\obj\Debug\net10.0\LabTrack.API.pdb
 C:\Users\Chrono\Projects\LabTrack.API\LabTrack.API\obj\Debug\net10.0\LabTrack.API.genruntimeconfig.cache
 C:\Users\Chrono\Projects\LabTrack.API\LabTrack.API\obj\Debug\net10.0\ref\LabTrack.API.dll
+C:\Users\Chrono\Projects\LabTrack.API\LabTrack.API\obj\Debug\net10.0\LabTrack.API.sourcelink.json

@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LabTrack.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3e01e7f18d0b1bb43995641ce23351d62af5aaf2")]
 [assembly: System.Reflection.AssemblyProductAttribute("LabTrack.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LabTrack.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

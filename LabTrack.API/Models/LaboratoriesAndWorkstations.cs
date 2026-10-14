@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LabTrack.Api.Models;
 
@@ -18,13 +17,7 @@ public class Laboratory
     public bool IsActive { get; set; } = true;
 
     public ICollection<Workstation> Workstations { get; set; } = new List<Workstation>();
-}
-
-public enum WorkstationStatus
-{
-    Offline = 0,
-    Active = 1,
-    Idle = 2
+    public ICollection<CourseSection> CourseSections { get; set; } = new List<CourseSection>();
 }
 
 public class Workstation
@@ -34,17 +27,20 @@ public class Workstation
     public int LabId { get; set; }
     public Laboratory Laboratory { get; set; } = null!;
 
-    /// <summary>Physical/hardware identifier for the PC (e.g. hostname or MAC-derived id).</summary>
+    /// <summary>
+    /// Fixed application-level PC ID (e.g. "CL1-PC07"), written into each agent's config
+    /// file at install time. This is what the agent sends on login so the server knows
+    /// which physical PC the attendance came from.
+    /// </summary>
     [MaxLength(100)]
-    public string DeviceIdentifier { get; set; } = string.Empty;
+    public string PcIdentifier { get; set; } = string.Empty;
 
-    /// <summary>Human-readable seat label used for the blueprint layout (e.g. "A1", "Row2-Seat7").</summary>
+    /// <summary>Human-readable seat label (e.g. "A1", "Row2-Seat7").</summary>
     [MaxLength(20)]
     public string SeatLabel { get; set; } = string.Empty;
 
-    public WorkstationStatus Status { get; set; } = WorkstationStatus.Offline;
-
-    public DateTime? LastHeartbeat { get; set; }
+    /// <summary>False for decommissioned or removed workstations.</summary>
+    public bool IsActive { get; set; } = true;
 
     public ICollection<AttendanceSession> AttendanceSessions { get; set; } = new List<AttendanceSession>();
 }

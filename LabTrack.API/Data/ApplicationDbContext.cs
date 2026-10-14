@@ -57,7 +57,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<Workstation>()
-            .HasIndex(w => w.DeviceIdentifier)
+            .HasIndex(w => w.PcIdentifier)
             .IsUnique();
 
         // A seat label only needs to be unique within its own lab (e.g. two different labs can
@@ -88,6 +88,23 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .WithMany(a => a.CourseSections)
             .HasForeignKey(c => c.AyId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // NEW: which lab this section meets in
+        builder.Entity<CourseSection>()
+            .HasOne(c => c.Laboratory)
+            .WithMany(l => l.CourseSections)
+            .HasForeignKey(c => c.LabId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // NEW: which faculty member is assigned (nullable until assigned)
+        builder.Entity<CourseSection>()
+            .HasOne(c => c.Faculty)
+            .WithMany()
+            .HasForeignKey(c => c.FacultyId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<CourseSection>()
+            .HasIndex(c => new { c.LabId, c.DayOfWeek });
 
         // ---- Session Confirmations ----
         builder.Entity<SessionConfirmation>()
