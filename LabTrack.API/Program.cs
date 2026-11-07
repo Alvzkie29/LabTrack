@@ -20,6 +20,8 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
     options.User.RequireUniqueEmail = true;
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
 })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
@@ -64,7 +66,6 @@ builder.Services.AddAuthorization();
 
 // ---- App services ----
 builder.Services.AddScoped<TokenService>();
-builder.Services.AddScoped<ActivityScoringService>();
 
 // ---- SignalR ----
 builder.Services.AddSignalR();
@@ -127,6 +128,8 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     db.Database.Migrate();
     await DbSeeder.SeedAsync(scope.ServiceProvider);
+    if (app.Environment.IsDevelopment())
+        await DbSeeder.SeedDemoDataAsync(scope.ServiceProvider);
 }
 
 if (app.Environment.IsDevelopment())

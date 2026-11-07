@@ -46,6 +46,22 @@ public class LaboratoriesController : ControllerBase
         return Ok(labs);
     }
 
+    /// <summary>Lists the workstations registered in one lab (static data, no live status).</summary>
+    [HttpGet("{id:int}/workstations")]
+    public async Task<IActionResult> GetWorkstations(int id)
+    {
+        var labExists = await _db.Laboratories.AnyAsync(l => l.LabId == id);
+        if (!labExists) return NotFound();
+
+        var workstations = await _db.Workstations
+            .Where(w => w.LabId == id)
+            .OrderBy(w => w.SeatLabel)
+            .Select(w => new { w.WorkstationId, w.SeatLabel, w.PcIdentifier, w.IsActive })
+            .ToListAsync();
+
+        return Ok(workstations);
+    }
+
     [HttpPost]
     [Authorize(Roles = "Administrator")]
     public async Task<IActionResult> Create(CreateLaboratoryDto dto)

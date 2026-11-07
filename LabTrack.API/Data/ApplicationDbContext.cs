@@ -17,7 +17,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ChedComplianceProgress> ChedComplianceProgresses => Set<ChedComplianceProgress>();
     public DbSet<RemedialRecommendation> RemedialRecommendations => Set<RemedialRecommendation>();
     public DbSet<AttendanceSession> AttendanceSessions => Set<AttendanceSession>();
-    public DbSet<ActivityScore> ActivityScores => Set<ActivityScore>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -35,7 +34,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<ChedComplianceProgress>().HasKey(p => p.ProgressId);
         builder.Entity<RemedialRecommendation>().HasKey(r => r.RecommendationId);
         builder.Entity<AttendanceSession>().HasKey(a => a.AttendanceId);
-        builder.Entity<ActivityScore>().HasKey(a => a.ActivityId);
         builder.Entity<AuditLog>().HasKey(a => a.AuditId);
 
         // ---- Users ----
@@ -114,10 +112,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<SessionConfirmation>()
-            .HasOne(sc => sc.ConfirmedByUser)
+            .HasOne(sc => sc.FacultyConfirmedByUser)
             .WithMany()
-            .HasForeignKey(sc => sc.ConfirmedBy)
+            .HasForeignKey(sc => sc.FacultyConfirmedBy)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SessionConfirmation>()
+            .HasOne(sc => sc.FinalConfirmedByUser)
+            .WithMany()
+            .HasForeignKey(sc => sc.FinalConfirmedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SessionConfirmation>()
+            .Property(sc => sc.SessionType)
+            .HasConversion<string>()
+            .HasMaxLength(20);
 
         // ---- CHED Compliance (one-to-one with CourseSection) ----
         builder.Entity<ChedComplianceProgress>()
@@ -155,23 +164,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .WithMany(c => c.AttendanceSessions)
             .HasForeignKey(a => a.SectionId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.Entity<AttendanceSession>()
-            .HasOne(a => a.ReviewedByUser)
-            .WithMany()
-            .HasForeignKey(a => a.ReviewedByUserId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // ---- Activity Scores (one-to-one with AttendanceSession) ----
-        builder.Entity<ActivityScore>()
-            .HasOne(a => a.AttendanceSession)
-            .WithOne(s => s.ActivityScore)
-            .HasForeignKey<ActivityScore>(a => a.AttendanceId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.Entity<ActivityScore>()
-            .HasIndex(a => a.AttendanceId)
-            .IsUnique();
 
         // ---- Audit Log ----
         builder.Entity<AuditLog>()

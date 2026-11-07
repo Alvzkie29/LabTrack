@@ -31,9 +31,12 @@ public class RegisterDto
     [Required, MinLength(6)]
     public string Password { get; set; } = string.Empty;
 
-    /// <summary>One of: Student, LabAssistant, Custodian, Administrator.</summary>
+    /// <summary>One of: Student, LabAssistant, Custodian, Faculty, Administrator.</summary>
     [Required]
     public string Role { get; set; } = "Student";
+
+    /// <summary>Faculty only: 4 to 6 digit PIN used to confirm sessions. Ignored for other roles.</summary>
+    public string? Pin { get; set; }
 
     public string? SupervisingCustodianId { get; set; }
 }

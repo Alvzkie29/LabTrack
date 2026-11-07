@@ -1,6 +1,7 @@
 ﻿using LabTrack.Api.Data;
 using LabTrack.Api.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,13 +11,17 @@ public class CreateCourseSectionDto
 {
     public int SubjectId { get; set; }
     public string SectionCode { get; set; } = string.Empty;
-    public string? InstructorName { get; set; }
+    public int LabId { get; set; }
+    public string? FacultyId { get; set; }
+    public string DayOfWeek { get; set; } = string.Empty; // e.g. "Monday"
+    public TimeOnly StartTime { get; set; }
+    public TimeOnly EndTime { get; set; }
     public int AyId { get; set; }
 }
 
-public class UpdateInstructorDto
+public class UpdateFacultyDto
 {
-    public string? InstructorName { get; set; }
+    public string? FacultyId { get; set; }
 }
 
 [ApiController]
@@ -25,18 +30,28 @@ public class UpdateInstructorDto
 public class CourseSectionsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
-    public CourseSectionsController(ApplicationDbContext db) => _db = db;
+    private readonly UserManager<ApplicationUser> _userManager;
+
+    public CourseSectionsController(ApplicationDbContext db, UserManager<ApplicationUser> userManager)
+    {
+        _db = db;
+        _userManager = userManager;
+    }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] int? ayId, [FromQuery] bool? pendingInstructorOnly)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int? ayId, [FromQuery] int? labId, [FromQuery] bool? pendingFacultyOnly)
     {
         var query = _db.CourseSections
             .Include(c => c.Subject)
             .Include(c => c.AcademicYear)
+            .Include(c => c.Laboratory)
+            .Include(c => c.Faculty)
             .AsQueryable();
 
         if (ayId.HasValue) query = query.Where(c => c.AyId == ayId.Value);
-        if (pendingInstructorOnly == true) query = query.Where(c => c.InstructorName == null);
+        if (labId.HasValue) query = query.Where(c => c.LabId == labId.Value);
+        if (pendingFacultyOnly == true) query = query.Where(c => c.FacultyId == null);
 
         var sections = await query.ToListAsync();
 
@@ -50,8 +65,13 @@ public class CourseSectionsController : ControllerBase
             c.SectionCode,
             Subject = new { c.Subject.SubjectId, c.Subject.Code, c.Subject.Title },
             AcademicYear = c.AcademicYear.Label,
-            c.InstructorName,
+            Laboratory = new { c.Laboratory.LabId, c.Laboratory.Name, c.Laboratory.RoomCode },
+            c.FacultyId,
+            Faculty = c.Faculty?.FullName,
             c.HasInstructorAssigned,
+            c.DayOfWeek,
+            c.StartTime,
+            c.EndTime,
             Compliance = progressBySection.TryGetValue(c.SectionId, out var p)
                 ? new { p.ConfirmedHoursTotal, p.RequiredHours, Status = p.Status.ToString() }
                 : null
@@ -64,7 +84,10 @@ public class CourseSectionsController : ControllerBase
         var section = await _db.CourseSections
             .Include(c => c.Subject)
             .Include(c => c.AcademicYear)
-            .Include(c => c.SessionConfirmations).ThenInclude(sc => sc.ConfirmedByUser)
+            .Include(c => c.Laboratory)
+            .Include(c => c.Faculty)
+            .Include(c => c.SessionConfirmations).ThenInclude(sc => sc.FacultyConfirmedByUser)
+            .Include(c => c.SessionConfirmations).ThenInclude(sc => sc.FinalConfirmedByUser)
             .FirstOrDefaultAsync(c => c.SectionId == id);
 
         if (section is null) return NotFound();
@@ -77,8 +100,13 @@ public class CourseSectionsController : ControllerBase
             section.SectionCode,
             Subject = new { section.Subject.SubjectId, section.Subject.Code, section.Subject.Title, section.Subject.RequiredHours, section.Subject.TermWeeks },
             AcademicYear = new { section.AcademicYear.Label, section.AcademicYear.StartDate, section.AcademicYear.EndDate },
-            section.InstructorName,
+            Laboratory = new { section.Laboratory.LabId, section.Laboratory.Name, section.Laboratory.RoomCode },
+            section.FacultyId,
+            Faculty = section.Faculty?.FullName,
             section.HasInstructorAssigned,
+            section.DayOfWeek,
+            section.StartTime,
+            section.EndTime,
             Compliance = progress is null ? null : new
             {
                 progress.ConfirmedHoursTotal,
@@ -91,8 +119,12 @@ public class CourseSectionsController : ControllerBase
                 .Select(sc => new
                 {
                     sc.ConfirmationId,
+                    SessionType = sc.SessionType.ToString(),
                     sc.SessionDate,
-                    ConfirmedBy = sc.ConfirmedByUser.FullName,
+                    FacultyConfirmedBy = sc.FacultyConfirmedByUser?.FullName,
+                    sc.FacultyConfirmedAt,
+                    FinalConfirmedBy = sc.FinalConfirmedByUser?.FullName,
+                    sc.FinalConfirmedAt,
                     sc.HoursCredited,
                     sc.Notes
                 })
@@ -100,28 +132,46 @@ public class CourseSectionsController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a Course Section and automatically creates its corresponding CHED Compliance
-    /// Progress row (one-to-one), seeded from the Subject's RequiredHours. InstructorName may be
-    /// left null — faculty assignment is often finalized after sections already exist.
+    /// Creates a Course Section with its lab and schedule (the Custodian's semester schedule
+    /// assignment) and its CHED Compliance Progress row. FacultyId may be left null.
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Administrator")]
+    [Authorize(Roles = "Custodian,Administrator")]
     public async Task<IActionResult> Create(CreateCourseSectionDto dto)
     {
         var subject = await _db.Subjects.FindAsync(dto.SubjectId);
         if (subject is null) return BadRequest("SubjectId does not exist.");
 
-        var ayExists = await _db.AcademicYears.AnyAsync(a => a.AyId == dto.AyId);
-        if (!ayExists) return BadRequest("AyId does not exist.");
+        if (!await _db.AcademicYears.AnyAsync(a => a.AyId == dto.AyId))
+            return BadRequest("AyId does not exist.");
+
+        if (!await _db.Laboratories.AnyAsync(l => l.LabId == dto.LabId))
+            return BadRequest("LabId does not exist.");
+
+        if (!Enum.TryParse<DayOfWeek>(dto.DayOfWeek, true, out var day))
+            return BadRequest("DayOfWeek must be a day name such as 'Monday'.");
+
+        if (dto.EndTime <= dto.StartTime)
+            return BadRequest("EndTime must be later than StartTime.");
 
         if (await _db.CourseSections.AnyAsync(c => c.SectionCode == dto.SectionCode))
             return BadRequest("A course section with this code already exists.");
+
+        if (dto.FacultyId is not null)
+        {
+            var error = await ValidateFacultyAsync(dto.FacultyId);
+            if (error is not null) return BadRequest(error);
+        }
 
         var section = new CourseSection
         {
             SubjectId = dto.SubjectId,
             SectionCode = dto.SectionCode,
-            InstructorName = dto.InstructorName,
+            LabId = dto.LabId,
+            FacultyId = dto.FacultyId,
+            DayOfWeek = day.ToString(),
+            StartTime = dto.StartTime,
+            EndTime = dto.EndTime,
             AyId = dto.AyId
         };
         _db.CourseSections.Add(section);
@@ -144,22 +194,40 @@ public class CourseSectionsController : ControllerBase
             section.SectionId,
             section.SectionCode,
             section.SubjectId,
-            section.InstructorName,
+            section.LabId,
+            section.FacultyId,
+            section.DayOfWeek,
+            section.StartTime,
+            section.EndTime,
             section.AyId
         });
     }
 
-    /// <summary>Assigns or updates the instructor for a section once faculty assignment is finalized.</summary>
-    [HttpPatch("{id:int}/instructor")]
-    [Authorize(Roles = "Administrator")]
-    public async Task<IActionResult> UpdateInstructor(int id, UpdateInstructorDto dto)
+    /// <summary>Assigns, changes, or clears (null) the faculty member for a section.</summary>
+    [HttpPatch("{id:int}/faculty")]
+    [Authorize(Roles = "Custodian,Administrator")]
+    public async Task<IActionResult> UpdateFaculty(int id, UpdateFacultyDto dto)
     {
         var section = await _db.CourseSections.FindAsync(id);
         if (section is null) return NotFound();
 
-        section.InstructorName = dto.InstructorName;
+        if (dto.FacultyId is not null)
+        {
+            var error = await ValidateFacultyAsync(dto.FacultyId);
+            if (error is not null) return BadRequest(error);
+        }
+
+        section.FacultyId = dto.FacultyId;
         await _db.SaveChangesAsync();
 
-        return Ok(new { section.SectionId, section.InstructorName, section.HasInstructorAssigned });
+        return Ok(new { section.SectionId, section.FacultyId, section.HasInstructorAssigned });
+    }
+
+    private async Task<string?> ValidateFacultyAsync(string facultyId)
+    {
+        var user = await _userManager.FindByIdAsync(facultyId);
+        if (user is null || !user.IsActive || !await _userManager.IsInRoleAsync(user, "Faculty"))
+            return "FacultyId must belong to an active user with the Faculty role.";
+        return null;
     }
 }

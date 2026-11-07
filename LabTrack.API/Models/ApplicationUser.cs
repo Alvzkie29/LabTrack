@@ -32,6 +32,7 @@ public class ApplicationUser : IdentityUser
     /// </summary>
     public string? SupervisingCustodianId { get; set; }
     public ApplicationUser? SupervisingCustodian { get; set; }
+    public string? PinHash { get; set; }
 
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

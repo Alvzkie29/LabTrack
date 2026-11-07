@@ -39,6 +39,13 @@ public class AuthController : ControllerBase
         if (!DbSeeder.Roles.Contains(dto.Role))
             return BadRequest($"Role must be one of: {string.Join(", ", DbSeeder.Roles)}");
 
+        if (dto.Role == "Faculty" && (string.IsNullOrWhiteSpace(dto.Pin)
+            || dto.Pin.Length is < 4 or > 6
+            || !dto.Pin.All(char.IsDigit)))
+                {
+                    return BadRequest("Faculty accounts need a PIN of 4 to 6 digits.");
+                }
+
         if (await _db.Users.AnyAsync(u => u.SchoolId == dto.SchoolId))
             return BadRequest("A user with this School ID already exists.");
 
@@ -52,6 +59,9 @@ public class AuthController : ControllerBase
             SchoolId = dto.SchoolId,
             SupervisingCustodianId = dto.SupervisingCustodianId
         };
+
+        if (dto.Role == "Faculty")
+            user.PinHash = new PasswordHasher<ApplicationUser>().HashPassword(user, dto.Pin!);
 
         var result = await _userManager.CreateAsync(user, dto.Password);
         if (!result.Succeeded)

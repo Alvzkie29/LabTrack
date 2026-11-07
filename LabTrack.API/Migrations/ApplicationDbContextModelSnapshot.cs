@@ -52,49 +52,6 @@ namespace LabTrack.API.Migrations
                     b.ToTable("AcademicYears");
                 });
 
-            modelBuilder.Entity("LabTrack.Api.Models.ActivityScore", b =>
-                {
-                    b.Property<int>("ActivityId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ActivityId"));
-
-                    b.Property<int>("ActiveHeartbeats")
-                        .HasColumnType("int");
-
-                    b.Property<int>("AttendanceId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("CompositeScore")
-                        .HasColumnType("decimal(5,2)");
-
-                    b.Property<DateTime>("ComputedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("IdleBreachHeartbeats")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PresenceStatus")
-                        .HasColumnType("int");
-
-                    b.Property<int>("TotalHeartbeats")
-                        .HasColumnType("int");
-
-                    b.Property<long>("TotalKeystrokes")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("TotalMouseEvents")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("ActivityId");
-
-                    b.HasIndex("AttendanceId")
-                        .IsUnique();
-
-                    b.ToTable("ActivityScores");
-                });
-
             modelBuilder.Entity("LabTrack.Api.Models.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
@@ -154,6 +111,9 @@ namespace LabTrack.API.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("PinHash")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("SchoolId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
@@ -197,27 +157,12 @@ namespace LabTrack.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendanceId"));
 
-                    b.Property<bool>("IsReviewed")
-                        .HasColumnType("bit");
-
                     b.Property<DateTime>("LoginTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("LogoutTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ReviewNotes")
+                    b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
-
-                    b.Property<int?>("ReviewOutcome")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ReviewedByUserId")
-                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("SectionId")
                         .HasColumnType("int");
@@ -230,8 +175,6 @@ namespace LabTrack.API.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("AttendanceId");
-
-                    b.HasIndex("ReviewedByUserId");
 
                     b.HasIndex("SectionId");
 
@@ -329,14 +272,27 @@ namespace LabTrack.API.Migrations
                     b.Property<int>("AyId")
                         .HasColumnType("int");
 
-                    b.Property<string>("InstructorName")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
+                    b.Property<string>("DayOfWeek")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("FacultyId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("LabId")
+                        .HasColumnType("int");
 
                     b.Property<string>("SectionCode")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time");
 
                     b.Property<int>("SubjectId")
                         .HasColumnType("int");
@@ -345,10 +301,14 @@ namespace LabTrack.API.Migrations
 
                     b.HasIndex("AyId");
 
+                    b.HasIndex("FacultyId");
+
                     b.HasIndex("SectionCode")
                         .IsUnique();
 
                     b.HasIndex("SubjectId");
+
+                    b.HasIndex("LabId", "DayOfWeek");
 
                     b.ToTable("CourseSections");
                 });
@@ -417,12 +377,20 @@ namespace LabTrack.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConfirmationId"));
 
-                    b.Property<string>("ConfirmedBy")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FacultyConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FacultyConfirmedBy")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("FinalConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FinalConfirmedBy")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<decimal>("HoursCredited")
                         .HasColumnType("decimal(5,2)");
@@ -437,9 +405,16 @@ namespace LabTrack.API.Migrations
                     b.Property<DateTime>("SessionDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("SessionType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.HasKey("ConfirmationId");
 
-                    b.HasIndex("ConfirmedBy");
+                    b.HasIndex("FacultyConfirmedBy");
+
+                    b.HasIndex("FinalConfirmedBy");
 
                     b.HasIndex("SectionId");
 
@@ -496,28 +471,25 @@ namespace LabTrack.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("WorkstationId"));
 
-                    b.Property<string>("DeviceIdentifier")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
 
                     b.Property<int>("LabId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime?>("LastHeartbeat")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("PcIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("SeatLabel")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
                     b.HasKey("WorkstationId");
 
-                    b.HasIndex("DeviceIdentifier")
+                    b.HasIndex("PcIdentifier")
                         .IsUnique();
 
                     b.HasIndex("LabId", "SeatLabel")
@@ -659,17 +631,6 @@ namespace LabTrack.API.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("LabTrack.Api.Models.ActivityScore", b =>
-                {
-                    b.HasOne("LabTrack.Api.Models.AttendanceSession", "AttendanceSession")
-                        .WithOne("ActivityScore")
-                        .HasForeignKey("LabTrack.Api.Models.ActivityScore", "AttendanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AttendanceSession");
-                });
-
             modelBuilder.Entity("LabTrack.Api.Models.ApplicationUser", b =>
                 {
                     b.HasOne("LabTrack.Api.Models.ApplicationUser", "SupervisingCustodian")
@@ -682,11 +643,6 @@ namespace LabTrack.API.Migrations
 
             modelBuilder.Entity("LabTrack.Api.Models.AttendanceSession", b =>
                 {
-                    b.HasOne("LabTrack.Api.Models.ApplicationUser", "ReviewedByUser")
-                        .WithMany()
-                        .HasForeignKey("ReviewedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("LabTrack.Api.Models.CourseSection", "CourseSection")
                         .WithMany("AttendanceSessions")
                         .HasForeignKey("SectionId")
@@ -706,8 +662,6 @@ namespace LabTrack.API.Migrations
                         .IsRequired();
 
                     b.Navigation("CourseSection");
-
-                    b.Navigation("ReviewedByUser");
 
                     b.Navigation("Student");
 
@@ -743,6 +697,17 @@ namespace LabTrack.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("LabTrack.Api.Models.ApplicationUser", "Faculty")
+                        .WithMany()
+                        .HasForeignKey("FacultyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("LabTrack.Api.Models.Laboratory", "Laboratory")
+                        .WithMany("CourseSections")
+                        .HasForeignKey("LabId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("LabTrack.Api.Models.Subject", "Subject")
                         .WithMany("CourseSections")
                         .HasForeignKey("SubjectId")
@@ -750,6 +715,10 @@ namespace LabTrack.API.Migrations
                         .IsRequired();
 
                     b.Navigation("AcademicYear");
+
+                    b.Navigation("Faculty");
+
+                    b.Navigation("Laboratory");
 
                     b.Navigation("Subject");
                 });
@@ -767,11 +736,15 @@ namespace LabTrack.API.Migrations
 
             modelBuilder.Entity("LabTrack.Api.Models.SessionConfirmation", b =>
                 {
-                    b.HasOne("LabTrack.Api.Models.ApplicationUser", "ConfirmedByUser")
+                    b.HasOne("LabTrack.Api.Models.ApplicationUser", "FacultyConfirmedByUser")
                         .WithMany()
-                        .HasForeignKey("ConfirmedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasForeignKey("FacultyConfirmedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("LabTrack.Api.Models.ApplicationUser", "FinalConfirmedByUser")
+                        .WithMany()
+                        .HasForeignKey("FinalConfirmedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("LabTrack.Api.Models.CourseSection", "CourseSection")
                         .WithMany("SessionConfirmations")
@@ -779,9 +752,11 @@ namespace LabTrack.API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ConfirmedByUser");
-
                     b.Navigation("CourseSection");
+
+                    b.Navigation("FacultyConfirmedByUser");
+
+                    b.Navigation("FinalConfirmedByUser");
                 });
 
             modelBuilder.Entity("LabTrack.Api.Models.Workstation", b =>
@@ -851,11 +826,6 @@ namespace LabTrack.API.Migrations
                     b.Navigation("CourseSections");
                 });
 
-            modelBuilder.Entity("LabTrack.Api.Models.AttendanceSession", b =>
-                {
-                    b.Navigation("ActivityScore");
-                });
-
             modelBuilder.Entity("LabTrack.Api.Models.CourseSection", b =>
                 {
                     b.Navigation("AttendanceSessions");
@@ -865,6 +835,8 @@ namespace LabTrack.API.Migrations
 
             modelBuilder.Entity("LabTrack.Api.Models.Laboratory", b =>
                 {
+                    b.Navigation("CourseSections");
+
                     b.Navigation("Workstations");
                 });
 
