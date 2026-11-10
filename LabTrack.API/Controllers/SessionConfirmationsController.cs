@@ -140,6 +140,15 @@ public class SessionConfirmationsController : ControllerBase
             sc.SectionId == dto.SectionId && sc.SessionDate == date && sc.SessionType == SessionType.Physical);
         if (exists) return BadRequest("This session already has a confirmation.");
 
+        // Hours come from the lab meeting(s) this class has on that weekday.
+        var weekday = date.DayOfWeek.ToString();
+        var meetings = await _db.SectionSchedules
+            .Where(m => m.SectionId == dto.SectionId && m.DayOfWeek == weekday)
+            .ToListAsync();
+        if (meetings.Count == 0)
+            return BadRequest("This class has no lab meeting on that day of the week.");
+        var hours = (decimal)meetings.Sum(m => (m.EndTime - m.StartTime).TotalHours);
+
         var staffId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         var confirmation = new SessionConfirmation
@@ -149,7 +158,7 @@ public class SessionConfirmationsController : ControllerBase
             SessionDate = date,
             FacultyConfirmedBy = faculty.Id,
             FacultyConfirmedAt = DateTime.UtcNow,
-            HoursCredited = (decimal)(section.EndTime - section.StartTime).TotalHours
+            HoursCredited = hours
         };
         _db.SessionConfirmations.Add(confirmation);
         await _db.SaveChangesAsync(); // generates ConfirmationId

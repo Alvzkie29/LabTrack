@@ -18,6 +18,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<RemedialRecommendation> RemedialRecommendations => Set<RemedialRecommendation>();
     public DbSet<AttendanceSession> AttendanceSessions => Set<AttendanceSession>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<SectionEnrollment> SectionEnrollments => Set<SectionEnrollment>();
+    public DbSet<SectionSchedule> SectionSchedules => Set<SectionSchedule>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -71,8 +73,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .IsUnique();
 
         // ---- Course Sections ----
+        // A class code is unique within an academic year, but can repeat in a later term.
         builder.Entity<CourseSection>()
-            .HasIndex(c => c.SectionCode)
+            .HasIndex(c => new { c.AyId, c.SectionCode })
             .IsUnique();
 
         builder.Entity<CourseSection>()
@@ -87,22 +90,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey(c => c.AyId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // NEW: which lab this section meets in
-        builder.Entity<CourseSection>()
-            .HasOne(c => c.Laboratory)
-            .WithMany(l => l.CourseSections)
-            .HasForeignKey(c => c.LabId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         // NEW: which faculty member is assigned (nullable until assigned)
         builder.Entity<CourseSection>()
             .HasOne(c => c.Faculty)
             .WithMany()
             .HasForeignKey(c => c.FacultyId)
             .OnDelete(DeleteBehavior.SetNull);
-
-        builder.Entity<CourseSection>()
-            .HasIndex(c => new { c.LabId, c.DayOfWeek });
 
         // ---- Session Confirmations ----
         builder.Entity<SessionConfirmation>()
@@ -174,5 +167,43 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<AuditLog>()
             .HasIndex(a => new { a.EntityType, a.EntityId });
+
+        // ---- Section Enrollments (class roster) ----
+        builder.Entity<SectionEnrollment>().HasKey(e => e.EnrollmentId);
+
+        builder.Entity<SectionEnrollment>()
+            .HasOne(e => e.CourseSection)
+            .WithMany(c => c.Enrollments)
+            .HasForeignKey(e => e.SectionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SectionEnrollment>()
+            .HasOne(e => e.Student)
+            .WithMany()
+            .HasForeignKey(e => e.StudentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // A student can be on a section's roster only once.
+        builder.Entity<SectionEnrollment>()
+            .HasIndex(e => new { e.SectionId, e.StudentId })
+            .IsUnique();
+        // ---- Section Schedules (lab meetings) ----
+        builder.Entity<SectionSchedule>().HasKey(s => s.ScheduleId);
+
+        builder.Entity<SectionSchedule>()
+            .HasOne(s => s.CourseSection)
+            .WithMany(c => c.Schedules)
+            .HasForeignKey(s => s.SectionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SectionSchedule>()
+            .HasOne(s => s.Laboratory)
+            .WithMany(l => l.Schedules)
+            .HasForeignKey(s => s.LabId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // The lookup the agent runs at every login: the meetings in this lab on this day.
+        builder.Entity<SectionSchedule>()
+            .HasIndex(s => new { s.LabId, s.DayOfWeek });
     }
 }

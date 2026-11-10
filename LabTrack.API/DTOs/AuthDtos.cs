@@ -50,6 +50,7 @@ public class AuthResponseDto
     public string SchoolId { get; set; } = string.Empty;
     public string? Email { get; set; }
     public IList<string> Roles { get; set; } = new List<string>();
+    public bool MustChangePassword { get; set; }
 }
 
 public class ChangePasswordDto

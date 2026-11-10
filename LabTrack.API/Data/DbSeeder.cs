@@ -40,7 +40,7 @@ public static class DbSeeder
     }
     /// <summary>
     /// Development-only demo data: one lab with workstations, a subject, an active academic year,
-    /// sections every day of the week, and one account for each role. Safe to run repeatedly.
+    /// classes with twice-weekly lab meetings, Monday to Friday, and one account for each role. Safe to run repeatedly.
     /// </summary>
     public static async Task SeedDemoDataAsync(IServiceProvider services)
     {
@@ -57,7 +57,7 @@ public static class DbSeeder
         await EnsureUserAsync(userManager, "student@labtrack.local", "Juan", "Dela Cruz",
             "2026-0001", "Student@123", "Student");
 
-        // ---- Lab, subjects, academic year, sections (created once) ----
+        // ---- Labs, subjects, academic year, classes (created once) ----
         if (await db.Laboratories.AnyAsync(l => l.RoomCode == "CL1")) return;
 
         var ay = new AcademicYear
@@ -68,59 +68,80 @@ public static class DbSeeder
             EndDate = DateTime.Today.AddMonths(3),
             IsActive = true
         };
-        var dsa = new Subject { Code = "IT211", Title = "Data Structures and Algorithms", Units = 3, RequiredHours = 54m, TermWeeks = 18 };
-        var net = new Subject { Code = "IT212", Title = "Networking Fundamentals", Units = 3, RequiredHours = 54m, TermWeeks = 18 };
-        var lab = new Laboratory
+
+        var subjects = new[]
         {
-            Name = "Computer Laboratory 1",
-            RoomCode = "CL1",
+        new Subject { Code = "IT211", Title = "Data Structures and Algorithms", Units = 3, RequiredHours = 54m, TermWeeks = 18 },
+        new Subject { Code = "IT212", Title = "Networking Fundamentals",        Units = 3, RequiredHours = 54m, TermWeeks = 18 },
+        new Subject { Code = "IT213", Title = "Web Development",                Units = 3, RequiredHours = 54m, TermWeeks = 18 },
+        new Subject { Code = "IT214", Title = "Database Management Systems",    Units = 3, RequiredHours = 54m, TermWeeks = 18 },
+    };
+
+        Laboratory NewLab(string code, string name) => new()
+        {
+            Name = name,
+            RoomCode = code,
             Capacity = 40,
             IsActive = true,
             Workstations = Enumerable.Range(1, 5)
-                .Select(i => new Workstation { PcIdentifier = $"CL1-PC{i:00}", SeatLabel = $"PC-{i:00}", IsActive = true })
+                .Select(i => new Workstation { PcIdentifier = $"{code}-PC{i:00}", SeatLabel = $"PC-{i:00}", IsActive = true })
                 .ToList()
         };
 
+        var cl1 = NewLab("CL1", "Computer Laboratory 1");
+        var cl2 = NewLab("CL2", "Computer Laboratory 2");
+
         db.AcademicYears.Add(ay);
-        db.Subjects.AddRange(dsa, net);
-        db.Laboratories.Add(lab);
+        db.Subjects.AddRange(subjects);
+        db.Laboratories.AddRange(cl1, cl2);
         await db.SaveChangesAsync();
 
-        // Every day: IT211 runs almost all day so a class always matches when you test, and
-        // IT212 runs 6-9 PM so the dropdown always has another class to choose from.
-        foreach (var day in Enum.GetValues<DayOfWeek>())
+        // Class time blocks. Edit this list to match the real timetable.
+        var blocks = new[]
         {
-            var abbr = day.ToString()[..3].ToUpper();
+        (Start: new TimeOnly(8, 0),   End: new TimeOnly(10, 0)),
+        (Start: new TimeOnly(10, 0),  End: new TimeOnly(12, 0)),
+        (Start: new TimeOnly(13, 30), End: new TimeOnly(15, 30)),
+        (Start: new TimeOnly(15, 30), End: new TimeOnly(17, 30)),
+    };
 
+        SectionSchedule Meeting(DayOfWeek day, int block, Laboratory room) => new()
+        {
+            LabId = room.LabId,
+            DayOfWeek = day.ToString(),
+            StartTime = blocks[block].Start,
+            EndTime = blocks[block].End
+        };
+
+        // Each class has its university class code and meets twice a week in the lab, Monday to Friday only.
+        // Class 3496 has its second meeting in a different laboratory.
+        var classes = new (string Code, Subject Subject, SectionSchedule[] Meetings)[]
+        {
+        ("3494", subjects[0], new[] { Meeting(DayOfWeek.Monday,    0, cl1), Meeting(DayOfWeek.Thursday, 0, cl1) }),
+        ("3495", subjects[1], new[] { Meeting(DayOfWeek.Monday,    1, cl1), Meeting(DayOfWeek.Thursday, 1, cl1) }),
+        ("3496", subjects[2], new[] { Meeting(DayOfWeek.Tuesday,   0, cl1), Meeting(DayOfWeek.Friday,   0, cl2) }),
+        ("3497", subjects[3], new[] { Meeting(DayOfWeek.Tuesday,   1, cl1), Meeting(DayOfWeek.Friday,   1, cl1) }),
+        ("3498", subjects[0], new[] { Meeting(DayOfWeek.Wednesday, 0, cl1), Meeting(DayOfWeek.Friday,   2, cl1) }),
+        ("3499", subjects[1], new[] { Meeting(DayOfWeek.Monday,    2, cl2), Meeting(DayOfWeek.Wednesday, 3, cl2) }),
+        ("3500", subjects[2], new[] { Meeting(DayOfWeek.Tuesday,   3, cl2), Meeting(DayOfWeek.Thursday,  2, cl2) }),
+        ("3502", subjects[3], new[] { Meeting(DayOfWeek.Wednesday, 2, cl1), Meeting(DayOfWeek.Monday,    3, cl1) }),
+        };
+
+        foreach (var c in classes)
+        {
             db.CourseSections.Add(new CourseSection
             {
-                SectionCode = $"IT211-CL1-{abbr}",
-                SubjectId = dsa.SubjectId,
-                LabId = lab.LabId,
+                SectionCode = c.Code,
+                SubjectId = c.Subject.SubjectId,
                 FacultyId = faculty.Id,
-                DayOfWeek = day.ToString(),
-                StartTime = new TimeOnly(1, 0),
-                EndTime = new TimeOnly(23, 59),
-                AyId = ay.AyId
-            });
-
-            db.CourseSections.Add(new CourseSection
-            {
-                SectionCode = $"IT212-CL1-{abbr}",
-                SubjectId = net.SubjectId,
-                LabId = lab.LabId,
-                FacultyId = faculty.Id,
-                DayOfWeek = day.ToString(),
-                StartTime = new TimeOnly(18, 0),
-                EndTime = new TimeOnly(21, 0),
-                AyId = ay.AyId
+                AyId = ay.AyId,
+                Schedules = c.Meetings.ToList()
             });
         }
         await db.SaveChangesAsync();
 
-        // Each section needs its CHED compliance row, like CourseSectionsController.Create makes.
-        var sections = await db.CourseSections.Include(s => s.Subject)
-            .Where(s => s.LabId == lab.LabId).ToListAsync();
+        // Each class needs its CHED compliance row, like CourseSectionsController.Create makes.
+        var sections = await db.CourseSections.Include(s => s.Subject).ToListAsync();
         foreach (var section in sections)
         {
             var progress = new ChedComplianceProgress

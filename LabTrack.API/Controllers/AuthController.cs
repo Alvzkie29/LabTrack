@@ -131,7 +131,8 @@ public class AuthController : ControllerBase
             FullName = user.FullName,
             Email = user.Email,
             SchoolId = user.SchoolId,
-            Roles = roles
+            Roles = roles,
+            MustChangePassword = user.MustChangePassword,
         });
     }
 
@@ -144,9 +145,15 @@ public class AuthController : ControllerBase
         var user = await _userManager.FindByIdAsync(userId ?? string.Empty);
         if (user is null) return Unauthorized();
 
+        if (dto.NewPassword == DefaultPassword.ForStudent(user.SchoolId))
+            return BadRequest("Please choose a password different from the default.");
+
         var result = await _userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
         if (!result.Succeeded)
             return BadRequest(result.Errors.Select(e => e.Description));
+
+        user.MustChangePassword = false;
+        await _userManager.UpdateAsync(user);
 
         _db.AuditLogs.Add(new AuditLog
         {
@@ -158,24 +165,5 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Password changed successfully." });
-    }
-
-    [HttpGet("me")]
-    [Authorize]
-    public async Task<ActionResult<AuthResponseDto>> Me()
-    {
-        var userId = User.FindFirst("sub")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        var user = await _userManager.FindByIdAsync(userId ?? string.Empty);
-        if (user is null) return Unauthorized();
-
-        var roles = await _userManager.GetRolesAsync(user);
-        return Ok(new AuthResponseDto
-        {
-            UserId = user.Id,
-            FullName = user.FullName,
-            Email = user.Email,
-            SchoolId = user.SchoolId,
-            Roles = roles
-        });
     }
 }

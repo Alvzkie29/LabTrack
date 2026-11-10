@@ -51,6 +51,109 @@ public class AttendanceSessionsController : ControllerBase
         return Ok(rows);
     }
 
+    /// <summary>
+    /// Who attended one class on one day: rostered students split into present and absent,
+    /// plus students who logged in for this class but are not on its roster.
+    /// </summary>
+    [HttpGet("by-section/{sectionId:int}")]
+    [Authorize(Roles = "LabAssistant,Custodian,Administrator")]
+    public async Task<IActionResult> GetBySection(int sectionId, [FromQuery] DateOnly? date)
+    {
+        var section = await _db.CourseSections
+            .Include(s => s.Subject)
+            .FirstOrDefaultAsync(s => s.SectionId == sectionId);
+        if (section is null) return NotFound();
+
+        // Philippine time is UTC+8; login times are stored in UTC.
+        const int utcOffsetHours = 8;
+        var day = date ?? DateOnly.FromDateTime(DateTime.UtcNow.AddHours(utcOffsetHours));
+        var dayStartUtc = day.ToDateTime(TimeOnly.MinValue).AddHours(-utcOffsetHours);
+        var dayEndUtc = dayStartUtc.AddDays(1);
+        var weekday = day.DayOfWeek.ToString();
+        var meetings = await _db.SectionSchedules
+            .Where(m => m.SectionId == sectionId && m.DayOfWeek == weekday)
+            .OrderBy(m => m.StartTime)
+            .Select(m => new { m.StartTime, m.EndTime, Lab = m.Laboratory.RoomCode })
+            .ToListAsync();
+
+        var logins = await _db.AttendanceSessions
+            .Where(a => a.SectionId == sectionId && a.LoginTime >= dayStartUtc && a.LoginTime < dayEndUtc)
+            .Select(a => new
+            {
+                a.AttendanceId,
+                a.StudentId,
+                a.Student.SchoolId,
+                Name = a.Student.FullName,
+                Workstation = a.Workstation.SeatLabel,
+                a.Workstation.PcIdentifier,
+                a.LoginTime,
+                a.Notes
+            })
+            .ToListAsync();
+
+        var roster = await _db.SectionEnrollments
+            .Where(e => e.SectionId == sectionId)
+            .Select(e => new { e.StudentId, e.Student.SchoolId, Name = e.Student.FullName })
+            .ToListAsync();
+
+        // If a student logged in twice, keep the first login.
+        var loginByStudent = logins
+            .GroupBy(l => l.StudentId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(l => l.LoginTime).First());
+        var rosterIds = roster.Select(r => r.StudentId).ToHashSet();
+
+        object ToRow(string studentId) => ToLoginRow(loginByStudent[studentId], utcOffsetHours);
+
+        var present = roster
+            .Where(r => loginByStudent.ContainsKey(r.StudentId))
+            .OrderBy(r => r.Name)
+            .Select(r => ToRow(r.StudentId))
+            .ToList();
+
+        var absent = roster
+            .Where(r => !loginByStudent.ContainsKey(r.StudentId))
+            .OrderBy(r => r.Name)
+            .Select(r => new { r.StudentId, r.SchoolId, r.Name })
+            .ToList();
+
+        var notOnRoster = loginByStudent.Keys
+            .Where(id => !rosterIds.Contains(id))
+            .OrderBy(id => loginByStudent[id].Name)
+            .Select(ToRow)
+            .ToList();
+
+        return Ok(new
+        {
+            Section = new
+            {
+                section.SectionId,
+                section.SectionCode,
+                SubjectCode = section.Subject.Code,
+                SubjectTitle = section.Subject.Title,
+                Meetings = meetings
+            },
+            Date = day,
+            RosterCount = roster.Count,
+            PresentCount = present.Count,
+            AbsentCount = absent.Count,
+            Present = present,
+            Absent = absent,
+            NotOnRoster = notOnRoster
+        });
+    }
+
+    private static object ToLoginRow(dynamic login, int utcOffsetHours) => new
+    {
+        login.AttendanceId,
+        login.StudentId,
+        login.SchoolId,
+        login.Name,
+        login.Workstation,
+        login.PcIdentifier,
+        LoginTime = ((DateTime)login.LoginTime).AddHours(utcOffsetHours),
+        login.Notes
+    };
+
     /// <summary>The logged-in student's own attendance history.</summary>
     [HttpGet("mine")]
     [Authorize(Roles = "Student")]

@@ -17,7 +17,7 @@ public class Laboratory
     public bool IsActive { get; set; } = true;
 
     public ICollection<Workstation> Workstations { get; set; } = new List<Workstation>();
-    public ICollection<CourseSection> CourseSections { get; set; } = new List<CourseSection>();
+    public ICollection<SectionSchedule> Schedules { get; set; } = new List<SectionSchedule>();
 }
 
 public class Workstation
