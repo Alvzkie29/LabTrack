@@ -13,24 +13,25 @@ import type { Role } from "../api/auth";
 
 export type { Role };
 
-export const ROLES: Role[] = ["Administrator", "Custodian", "LabAssistant", "Student"];
+export const ROLES: Role[] = ["Administrator", "Custodian", "LabAssistant", "Faculty", "Student"];
 export const STAFF_ROLES: Role[] = ["Administrator", "Custodian", "LabAssistant"];
 
 const PERMISSIONS: Record<Role, string[]> = {
   Administrator: [
     "/dashboard", "/workstation", "/courses", "/at-risk", "/schedule",
-    "/lab-assignments", "/flagged-session", "/confirm-session",
-    "/attendance-report", "/users", "/settings",
+    "/confirm-session", "/imports",
+    "/attendance-report", "/compliance-report", "/audit-log", "/users", "/settings",
   ],
   Custodian: [
     "/dashboard", "/workstation", "/courses", "/at-risk", "/schedule",
-    "/lab-assignments", "/flagged-session", "/confirm-session",
-    "/attendance-report", "/settings",
+    "/confirm-session", "/imports",
+    "/attendance-report", "/compliance-report", "/audit-log", "/settings",
   ],
   LabAssistant: [
-    "/dashboard", "/workstation", "/schedule", "/confirm-session",
+    "/dashboard", "/workstation", "/schedule", "/confirm-session", "/imports",
     "/attendance-report", "/settings",
   ],
+  Faculty: [],
   Student: [],
 };
 

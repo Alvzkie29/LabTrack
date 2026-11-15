@@ -84,7 +84,7 @@ export function AtRiskPage() {
                   </td>
                   <td className="py-2 pr-3">{cs.subject.title}</td>
                   <td className="py-2 pr-3" style={{ color: cs.hasInstructorAssigned ? MUTED : MAROON }}>
-                    {cs.instructorName ?? "Unassigned"}
+                    {cs.faculty ?? "Unassigned"}
                   </td>
                   <td className="py-2 pr-3">
                     <StatusPill status={cs.compliance!.status} />

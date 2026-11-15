@@ -23,9 +23,9 @@ export function StaffLoginPage() {
     setIsSubmitting(true);
     try {
       const user = await login({ identifier, password });
-      if (user.role === "Student") {
+      if (user.role === "Student" || user.role === "Faculty") {
         // Students shouldn't land in the staff shell even if they use this form.
-        setError("This account is a Student account. Please use Student check-in instead.");
+        setError("Students and Faculty do not sign in here. Students log in on the lab PC; Faculty confirm with their PIN.");
         return;
       }
       navigate("/dashboard");
@@ -100,19 +100,6 @@ export function StaffLoginPage() {
               {isSubmitting ? "Signing in..." : "Sign in"}
             </Button>
           </form>
-
-          <div className="mt-6 pt-4" style={{ borderTop: "1px solid #e1e4e8" }}>
-            <Link
-              to="/student-login"
-              className="inline-flex items-center gap-1.5 text-[12.5px]"
-              style={{ color: MAROON, fontWeight: 500 }}
-            >
-              Student check-in <ArrowRight className="size-3.5" />
-            </Link>
-            <p className="mt-1 font-mono text-[10.5px]" style={{ color: "#57606a" }}>
-              Kiosk shown on the lab workstation itself.
-            </p>
-          </div>
         </div>
       </div>
     </div>

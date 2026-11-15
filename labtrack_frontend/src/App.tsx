@@ -8,7 +8,6 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import { RequireAuth } from "@/components/RequireAuth";
 
 import { StaffLoginPage } from "@/pages/auth/StaffLogin";
-import { StudentLoginPage } from "@/pages/auth/StudentLogin";
 
 import { AppLayout } from "@/pages/client/AppLayout";
 import { DashboardPage } from "@/pages/client/Dashboard";
@@ -17,13 +16,13 @@ import { CoursesPage } from "@/pages/client/Courses";
 import { CourseDetailPage } from "@/pages/client/CourseSection";
 import { AtRiskPage } from "@/pages/client/AtRisk";
 import { SchedulePage } from "@/pages/client/Schedule";
-import { LabAssignmentsPage } from "@/pages/client/LabAssignments";
-import { FlaggedSessionsPage } from "@/pages/client/FlaggedSession";
+import { AuditLogPage } from "@/pages/client/AuditLog";
+import { ComplianceReportPage } from "@/pages/client/ComplianceReport";
+import { ImportsPage } from "@/pages/client/Imports";
 import { ConfirmSessionsPage } from "@/pages/client/ConfirmSession";
 import { AttendanceReportsPage } from "@/pages/client/AttendanceReport";
 import { UsersPage } from "@/pages/client/Users";
 import { SettingsPage } from "@/pages/client/Settings";
-import { MyAttendancePage } from "@/pages/client/MyAttendance";
 
 import { NotFound } from "@/pages/public/NotFound";
 
@@ -38,8 +37,6 @@ function App() {
             <Routes>
               {/* Public / auth pages */}
               <Route path="/" element={<StaffLoginPage />} />
-              <Route path="/student-login" element={<StudentLoginPage />} />
-              <Route path="/my-attendance" element={<MyAttendancePage />} />
 
               {/* Staff app shell (sidebar + topbar) — requires a real logged-in session */}
               <Route
@@ -55,8 +52,9 @@ function App() {
                 <Route path="/courses/:sectionId" element={<CourseDetailPage />} />
                 <Route path="/at-risk" element={<AtRiskPage />} />
                 <Route path="/schedule" element={<SchedulePage />} />
-                <Route path="/lab-assignments" element={<LabAssignmentsPage />} />
-                <Route path="/flagged-session" element={<FlaggedSessionsPage />} />
+                <Route path="/audit-log" element={<AuditLogPage />} />
+                <Route path="/compliance-report" element={<ComplianceReportPage />} />
+                <Route path="/imports" element={<ImportsPage />} />
                 <Route path="/confirm-session" element={<ConfirmSessionsPage />} />
                 <Route path="/attendance-report" element={<AttendanceReportsPage />} />
                 <Route path="/users" element={<UsersPage />} />

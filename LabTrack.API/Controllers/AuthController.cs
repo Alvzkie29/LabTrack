@@ -75,7 +75,8 @@ public class AuthController : ControllerBase
             Action = "UserCreated",
             EntityType = nameof(ApplicationUser),
             EntityId = user.Id,
-            Details = $"Role={dto.Role}, SchoolId={dto.SchoolId}"
+            Details = $"Role={dto.Role}, SchoolId={dto.SchoolId}",
+            IpAddress = this.CallerIp()
         });
         await _db.SaveChangesAsync();
 
@@ -120,6 +121,7 @@ public class AuthController : ControllerBase
             Action = "UserLoggedIn",
             EntityType = nameof(ApplicationUser),
             EntityId = user.Id,
+            IpAddress = this.CallerIp()
         });
         await _db.SaveChangesAsync();
 
@@ -161,9 +163,28 @@ public class AuthController : ControllerBase
             Action = "PasswordChanged",
             EntityType = nameof(ApplicationUser),
             EntityId = user.Id,
+            IpAddress = this.CallerIp()
         });
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Password changed successfully." });
+    }
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<ActionResult<AuthResponseDto>> Me()
+    {
+        var userId = User.FindFirst("sub")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var user = await _userManager.FindByIdAsync(userId ?? string.Empty);
+        if (user is null || !user.IsActive) return Unauthorized();
+
+        var roles = await _userManager.GetRolesAsync(user);
+        return Ok(new AuthResponseDto
+        {
+            UserId = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            SchoolId = user.SchoolId,
+            Roles = roles
+        });
     }
 }

@@ -1,5 +1,4 @@
 import { getCourseSections } from "./courseSections";
-import { getFlaggedSessions } from "./attendance";
 import type { Role } from "./auth";
 
 export interface QuickAlert {
@@ -11,24 +10,11 @@ export interface QuickAlert {
 
 /**
  * Real, derived "quick info" alerts rather than a stored notifications system — computed
- * live from data that already exists (compliance status, flagged sessions, unassigned
- * instructors). No new backend table or persisted read/unread state; this is a summary
+ * live from data that already exists (compliance status, unassigned faculty). No new backend table or persisted read/unread state; this is a summary
  * view, refetched whenever Settings is opened.
  */
 export async function getQuickAlerts(role: Role): Promise<QuickAlert[]> {
   const alerts: QuickAlert[] = [];
-
-  if (role === "Custodian" || role === "Administrator" || role === "LabAssistant") {
-    const flagged = await getFlaggedSessions().catch(() => []);
-    if (flagged.length > 0) {
-      alerts.push({
-        id: "flagged",
-        message: `${flagged.length} session${flagged.length === 1 ? "" : "s"} flagged for review`,
-        tone: "warning",
-        href: "/flagged-session",
-      });
-    }
-  }
 
   if (role === "Custodian" || role === "Administrator") {
     const sections = await getCourseSections().catch(() => []);
@@ -47,7 +33,7 @@ export async function getQuickAlerts(role: Role): Promise<QuickAlert[]> {
     if (unassigned.length > 0) {
       alerts.push({
         id: "unassigned",
-        message: `${unassigned.length} section${unassigned.length === 1 ? "" : "s"} without an assigned instructor`,
+        message: `${unassigned.length} section${unassigned.length === 1 ? "" : "s"} without an assigned Faculty`,
         tone: "info",
         href: "/courses",
       });

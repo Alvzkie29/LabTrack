@@ -139,3 +139,10 @@
     font-family: var(--font-mono);
   }
 }
+
+
+/* Printing a report: hide the app chrome and anything marked no-print. */
+@media print {
+  aside, header, nav, .no-print, button { display: none !important; }
+  main { padding: 0 !important; }
+}

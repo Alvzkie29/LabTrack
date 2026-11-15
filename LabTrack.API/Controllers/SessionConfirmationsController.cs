@@ -1,10 +1,11 @@
-﻿using System.Security.Claims;
-using LabTrack.Api.Data;
+﻿using LabTrack.Api.Data;
 using LabTrack.Api.Models;
+using LabTrack.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace LabTrack.Api.Controllers;
 
@@ -169,7 +170,8 @@ public class SessionConfirmationsController : ControllerBase
             Action = "SessionFacultyConfirmed",
             EntityType = nameof(SessionConfirmation),
             EntityId = confirmation.ConfirmationId.ToString(),
-            Details = $"SectionId={dto.SectionId}, SessionDate={date:yyyy-MM-dd}, RecordedBy={staffId}"
+            Details = $"SectionId={dto.SectionId}, SessionDate={date:yyyy-MM-dd}, RecordedBy={staffId}",
+            IpAddress = this.CallerIp()
         });
         await _db.SaveChangesAsync();
 
@@ -271,7 +273,8 @@ public class SessionConfirmationsController : ControllerBase
             Action = "SessionFinalConfirmed",
             EntityType = nameof(SessionConfirmation),
             EntityId = confirmation.ConfirmationId.ToString(),
-            Details = $"SectionId={confirmation.SectionId}, Type={confirmation.SessionType}, HoursCredited={confirmation.HoursCredited}, SessionDate={confirmation.SessionDate:yyyy-MM-dd}"
+            Details = $"SectionId={confirmation.SectionId}, Type={confirmation.SessionType}, HoursCredited={confirmation.HoursCredited}, SessionDate={confirmation.SessionDate:yyyy-MM-dd}",
+            IpAddress = this.CallerIp()
         });
 
         if (progress.Status != ComplianceStatus.Compliant)

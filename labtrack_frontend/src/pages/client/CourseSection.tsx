@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useRole, canAccess } from "@/contexts/RoleContext";
 import { Restricted } from "@/components/Restricted";
 import { getCourseSection, type CourseSectionDetail } from "@/api/courseSections";
+import { getAttendanceHistory, type AttendanceDay } from "@/api/attendance";
 
 const MAROON = "#800000";
 const MUTED = "#57606a";
@@ -52,9 +53,11 @@ export function CourseDetailPage() {
   const [section, setSection] = useState<CourseSectionDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [history, setHistory] = useState<AttendanceDay[]>([]);
 
   useEffect(() => {
     if (!sectionId) return;
+    getAttendanceHistory(Number(sectionId)).then(setHistory).catch(() => setHistory([]));
     getCourseSection(Number(sectionId))
       .then(setSection)
       .catch(() => setNotFound(true))
@@ -83,8 +86,8 @@ export function CourseDetailPage() {
             {section.subject.title}
           </h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[12.5px]" style={{ color: MUTED }}>
-            <span>Instructor: <span style={{ color: section.hasInstructorAssigned ? "#0d1117" : MAROON }}>
-              {section.instructorName ?? "Unassigned"}
+            <span>Faculty: <span style={{ color: section.hasInstructorAssigned ? "#0d1117" : MAROON }}>
+              {section.faculty ?? "Unassigned"}
             </span></span>
             <span>·</span>
             <span>Academic Year: <span className="font-mono" style={{ color: "#0d1117" }}>{section.academicYear.label}</span></span>
@@ -94,8 +97,8 @@ export function CourseDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           <StatusPill status={section.compliance?.status ?? "NonCompliant"} />
-          <Button size="sm" variant="outline" className="h-8">
-            <FileText className="mr-1.5 size-3.5" /> Request report
+          <Button size="sm" variant="outline" className="h-8" onClick={() => window.print()}>
+            <FileText className="mr-1.5 size-3.5" /> Print report
           </Button>
         </div>
       </div>
@@ -150,6 +153,41 @@ export function CourseDetailPage() {
         </div>
       </div>
 
+      {/* Attendance by date */}
+      <div style={{ background: "#ffffff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
+        <div className="px-4 py-2.5" style={{ borderBottom: "1px solid #e1e4e8" }}>
+          <span className="text-[13px] font-semibold">Attendance by date</span>
+          <span className="ml-2 font-mono text-[11px]" style={{ color: MUTED }}>{history.length} class days</span>
+        </div>
+        <table className="w-full text-[12.5px]">
+          <thead>
+            <tr style={{ background: "#f6f8fa", color: MUTED }}>
+              <th className="py-2 pl-4 text-left font-mono text-[10.5px] uppercase tracking-wider">Date</th>
+              <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">Present / Class list</th>
+              <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">PCs in lab</th>
+              <th className="py-2 pr-4 text-left font-mono text-[10.5px] uppercase tracking-wider">Session</th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.map((d) => (
+              <tr key={d.date} style={{ borderTop: "1px solid #e1e4e8" }}>
+                <td className="py-2 pl-4 font-mono">{new Date(d.date + "T00:00:00").toLocaleDateString()}</td>
+                <td className="py-2 font-mono">{d.presentCount} / {d.rosterCount}</td>
+                <td className="py-2 font-mono">{d.workstations}</td>
+                <td className="py-2 pr-4 text-[11.5px]" style={{ color: d.confirmed ? "#1a7f37" : "#9a6700" }}>
+                  {d.confirmed ? `Confirmed · ${d.hoursCredited}h` : "Not yet confirmed"}
+                </td>
+              </tr>
+            ))}
+            {history.length === 0 && (
+              <tr>
+                <td colSpan={4} className="py-4 text-center text-[12px]" style={{ color: MUTED }}>No student logins recorded yet.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
       {/* Session confirmations */}
       <div style={{ background: "#ffffff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
         <div className="px-4 py-2.5" style={{ borderBottom: "1px solid #e1e4e8" }}>
@@ -162,7 +200,8 @@ export function CourseDetailPage() {
           <thead>
             <tr style={{ background: "#f6f8fa", color: MUTED }}>
               <th className="py-2 pl-4 text-left font-mono text-[10.5px] uppercase tracking-wider">Date</th>
-              <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">Confirmed by</th>
+              <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">Type / Faculty</th>
+              <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">Final confirmation</th>
               <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">Hours credited</th>
               <th className="py-2 pr-4 text-left font-mono text-[10.5px] uppercase tracking-wider">Notes</th>
             </tr>
@@ -171,14 +210,15 @@ export function CourseDetailPage() {
             {section.sessionConfirmations.map((sc) => (
               <tr key={sc.confirmationId} style={{ borderTop: "1px solid #e1e4e8" }}>
                 <td className="py-2 pl-4 font-mono">{new Date(sc.sessionDate).toLocaleDateString()}</td>
-                <td className="py-2 font-mono" style={{ color: "#0d1117" }}>{sc.confirmedBy}</td>
+                <td className="py-2" style={{ color: "#0d1117" }}>{sc.sessionType}{sc.facultyConfirmedBy ? ` · ${sc.facultyConfirmedBy}` : ""}</td>
+                <td className="py-2" style={{ color: sc.finalConfirmedAt ? "#0d1117" : "#9a6700" }}>{sc.finalConfirmedBy ?? "Pending"}</td>
                 <td className="py-2 font-mono">{sc.hoursCredited}h</td>
                 <td className="py-2 pr-4 text-[11.5px]" style={{ color: MUTED }}>{sc.notes ?? "—"}</td>
               </tr>
             ))}
             {section.sessionConfirmations.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-4 text-center text-[12px]" style={{ color: MUTED }}>
+                <td colSpan={5} className="py-4 text-center text-[12px]" style={{ color: MUTED }}>
                   No confirmed sessions yet.
                 </td>
               </tr>

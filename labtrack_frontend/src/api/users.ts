@@ -31,6 +31,7 @@ export interface CreateUserPayload {
   email: string;
   password: string;
   role: Role;
+  pin?: string; // Faculty only
 }
 
 /**

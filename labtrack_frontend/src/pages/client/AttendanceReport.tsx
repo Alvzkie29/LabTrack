@@ -76,11 +76,8 @@ export function AttendanceReportsPage() {
         Section: r.section,
         Workstation: r.workstation,
         "Login Time": new Date(r.loginTime).toLocaleString(),
-        "Logout Time": r.logoutTime ? new Date(r.logoutTime).toLocaleString() : "",
-        "Activity Score": r.activityScore ?? "",
-        "Presence Status": r.presenceStatus ?? "",
-        Reviewed: r.isReviewed ? "Yes" : "No",
-        "Review Outcome": r.reviewOutcome ?? "",
+        "PC": r.pcIdentifier,
+        Notes: r.notes ?? "",
       })),
     );
   };
@@ -179,8 +176,7 @@ export function AttendanceReportsPage() {
               <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">Section</th>
               <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">Workstation</th>
               <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">Login</th>
-              <th className="py-2 text-left font-mono text-[10.5px] uppercase tracking-wider">Logout</th>
-              <th className="py-2 pr-4 text-right font-mono text-[10.5px] uppercase tracking-wider">Score</th>
+              <th className="py-2 pr-4 text-left font-mono text-[10.5px] uppercase tracking-wider">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -193,15 +189,12 @@ export function AttendanceReportsPage() {
                 <td className="py-2 pr-3 font-mono" style={{ color: MAROON, fontWeight: 600 }}>{r.section}</td>
                 <td className="py-2 pr-3 font-mono">{r.workstation}</td>
                 <td className="py-2 pr-3 font-mono text-[11.5px]">{new Date(r.loginTime).toLocaleString()}</td>
-                <td className="py-2 pr-3 font-mono text-[11.5px]" style={{ color: MUTED }}>
-                  {r.logoutTime ? new Date(r.logoutTime).toLocaleString() : "still active"}
-                </td>
-                <td className="py-2 pr-4 text-right font-mono">{r.activityScore?.toFixed(0) ?? "—"}</td>
+                <td className="py-2 pr-4 text-[11.5px]" style={{ color: MUTED }}>{r.notes ?? "—"}</td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-[13px]" style={{ color: MUTED }}>
+                <td colSpan={5} className="py-8 text-center text-[13px]" style={{ color: MUTED }}>
                   {!hasSearched ? "Set your filters and run the report." : "No records match these filters."}
                 </td>
               </tr>

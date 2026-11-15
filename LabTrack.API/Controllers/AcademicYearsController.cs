@@ -65,4 +65,72 @@ public class AcademicYearsController : ControllerBase
 
         return Ok(new { target.AyId, target.Label, target.IsActive });
     }
+    /// <summary>
+    /// One row per class day with at least one login: how many rostered students were present,
+    /// the class list size, the active PCs in the lab(s) the class met in that day, and whether
+    /// that day's session has been finally confirmed (with the hours credited).
+    /// </summary>
+    [HttpGet("by-section/{sectionId:int}/history")]
+    [Authorize(Roles = "LabAssistant,Custodian,Administrator")]
+    public async Task<IActionResult> GetHistory(int sectionId)
+    {
+        // Philippine time is UTC+8; login times are stored in UTC.
+        const int utcOffsetHours = 8;
+
+        var rosterIds = (await _db.SectionEnrollments
+            .Where(e => e.SectionId == sectionId)
+            .Select(e => e.StudentId)
+            .ToListAsync()).ToHashSet();
+
+        var logins = await _db.AttendanceSessions
+            .Where(a => a.SectionId == sectionId)
+            .Select(a => new { a.StudentId, a.LoginTime })
+            .ToListAsync();
+
+        var meetings = await _db.SectionSchedules
+            .Where(m => m.SectionId == sectionId)
+            .Select(m => new { m.DayOfWeek, m.LabId })
+            .ToListAsync();
+
+        var activePcsByLab = await _db.Workstations
+            .Where(w => w.IsActive)
+            .GroupBy(w => w.LabId)
+            .Select(g => new { LabId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.LabId, x => x.Count);
+
+        var confirmations = await _db.SessionConfirmations
+            .Where(sc => sc.SectionId == sectionId && sc.FinalConfirmedAt != null)
+            .Select(sc => new { sc.SessionDate, sc.HoursCredited })
+            .ToListAsync();
+
+        var days = logins
+            .GroupBy(l => DateOnly.FromDateTime(l.LoginTime.AddHours(utcOffsetHours)))
+            .OrderByDescending(g => g.Key)
+            .Select(g =>
+            {
+                var weekday = g.Key.DayOfWeek.ToString();
+                var pcs = meetings
+                    .Where(m => m.DayOfWeek == weekday)
+                    .Select(m => m.LabId)
+                    .Distinct()
+                    .Sum(labId => activePcsByLab.GetValueOrDefault(labId));
+
+                var confirmed = confirmations
+                    .Where(c => DateOnly.FromDateTime(c.SessionDate) == g.Key)
+                    .ToList();
+
+                return new
+                {
+                    Date = g.Key,
+                    PresentCount = g.Select(x => x.StudentId).Distinct().Count(x => rosterIds.Contains(x)),
+                    RosterCount = rosterIds.Count,
+                    Workstations = pcs,
+                    Confirmed = confirmed.Count > 0,
+                    HoursCredited = confirmed.Count > 0 ? (decimal?)confirmed.Sum(c => c.HoursCredited) : null
+                };
+            })
+            .ToList();
+
+        return Ok(days);
+    }
 }

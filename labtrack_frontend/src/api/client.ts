@@ -28,6 +28,7 @@ type RequestOptions = {
   body?: unknown;
   /** Skip attaching the Authorization header (only needed for login/register). */
   skipAuth?: boolean;
+  keepSessionOn401?: boolean;
 };
 
 /**
@@ -35,11 +36,11 @@ type RequestOptions = {
  * try/catch or let react-query surface the error.
  */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, skipAuth = false } = options;
+  const { method = "GET", body, skipAuth = false, keepSessionOn401 = false } = options;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  // File uploads send FormData; the browser sets the multipart Content-Type itself.
+  const isForm = body instanceof FormData;
+  const headers: Record<string, string> = isForm ? {} : { "Content-Type": "application/json" };
 
   if (!skipAuth) {
     const token = getToken();
@@ -49,10 +50,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 && !keepSessionOn401) {
     // Token missing/expired/invalid — clear it so the app falls back to the login screen.
     setToken(null);
   }

@@ -16,10 +16,10 @@ export type UserAccount = {
 
 export const USERS: UserAccount[] = [
   { id: "U-001", name: "Dr. Elena Cruz",  email: "admin@labtrack.edu",      role: "Administrator", isActive: true,  lastActive: "2026-07-16T08:12:00Z" },
-  { id: "U-002", name: "Pedro Bautista",  email: "custodian@labtrack.edu",  role: "Laboratory Custodian",      isActive: true,  lastActive: "2026-07-16T07:40:00Z" },
-  { id: "U-003", name: "Alex Rivera",     email: "a.rivera@labtrack.edu",   role: "Laboratory Assistant",  isActive: true,  lastActive: "2026-07-16T08:02:00Z" },
-  { id: "U-004", name: "Miguel Torres",   email: "m.torres@labtrack.edu",   role: "Laboratory Assistant",  isActive: true,  lastActive: "2026-07-15T16:20:00Z" },
-  { id: "U-005", name: "Grace Alvarez",   email: "g.alvarez@labtrack.edu",  role: "Laboratory Assistant",  isActive: false, lastActive: "2026-06-28T10:05:00Z" },
+  { id: "U-002", name: "Pedro Bautista",  email: "custodian@labtrack.edu",  role: "Custodian",      isActive: true,  lastActive: "2026-07-16T07:40:00Z" },
+  { id: "U-003", name: "Alex Rivera",     email: "a.rivera@labtrack.edu",   role: "LabAssistant",  isActive: true,  lastActive: "2026-07-16T08:02:00Z" },
+  { id: "U-004", name: "Miguel Torres",   email: "m.torres@labtrack.edu",   role: "LabAssistant",  isActive: true,  lastActive: "2026-07-15T16:20:00Z" },
+  { id: "U-005", name: "Grace Alvarez",   email: "g.alvarez@labtrack.edu",  role: "LabAssistant",  isActive: false, lastActive: "2026-06-28T10:05:00Z" },
   { id: "U-006", name: "Jamie Cortez",    email: "jamie.cortez@umindanao.edu.ph", role: "Student",  isActive: true,  lastActive: "2026-07-16T09:15:00Z" },
 ];
 
@@ -28,7 +28,7 @@ export function userById(id?: string): UserAccount | undefined {
 }
 
 export function assistants(): UserAccount[] {
-  return USERS.filter((u) => u.role === "Laboratory Assistant");
+  return USERS.filter((u) => u.role === "LabAssistant");
 }
 
 // ---------- Laboratory Assignments (Table 9 relationship) ----------

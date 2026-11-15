@@ -168,6 +168,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<AuditLog>()
             .HasIndex(a => new { a.EntityType, a.EntityId });
 
+        builder.Entity<AuditLog>()
+            .HasIndex(a => a.Timestamp)
+            .IsDescending();
+
         // ---- Section Enrollments (class roster) ----
         builder.Entity<SectionEnrollment>().HasKey(e => e.EnrollmentId);
 

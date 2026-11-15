@@ -226,6 +226,9 @@ namespace LabTrack.API.Migrations
 
                     b.HasKey("AuditId");
 
+                    b.HasIndex("Timestamp")
+                        .IsDescending();
+
                     b.HasIndex("UserId");
 
                     b.HasIndex("EntityType", "EntityId");

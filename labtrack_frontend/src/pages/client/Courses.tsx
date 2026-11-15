@@ -63,7 +63,7 @@ export function CoursesPage() {
                   </td>
                   <td className="py-2.5 pr-3">{cs.subject.title}</td>
                   <td className="py-2.5 pr-3" style={{ color: cs.hasInstructorAssigned ? MUTED : MAROON }}>
-                    {cs.instructorName ?? "Unassigned"}
+                    {cs.faculty ?? "Unassigned"}
                   </td>
                   <td className="py-2.5 pr-3 font-mono text-[11.5px]" style={{ color: "#0d1117" }}>
                     {cs.academicYear}

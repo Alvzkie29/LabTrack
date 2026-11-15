@@ -1,31 +1,56 @@
 import { apiRequest } from "./client";
 
-export interface ConfirmSessionPayload {
-  sectionId: number;
-  sessionDate: string; // ISO date string
-  hoursCredited: number;
-  notes?: string;
+export interface Compliance {
+  confirmedHoursTotal: number;
+  requiredHours: number;
+  status: "Compliant" | "AtRisk" | "NonCompliant";
 }
 
-export interface ConfirmSessionResult {
+export interface FacultyOption {
+  id: string;
+  fullName: string;
+  schoolId: string;
+  isAssigned: boolean;
+}
+
+export interface ConfirmationRow {
   confirmationId: number;
+  sessionType: "Physical" | "Virtual";
   sessionDate: string;
+  facultyConfirmedBy: string | null;
+  facultyConfirmedAt: string | null;
+  finalConfirmedBy: string | null;
+  finalConfirmedAt: string | null;
   hoursCredited: number;
-  compliance: {
-    confirmedHoursTotal: number;
-    requiredHours: number;
-    status: "Compliant" | "AtRisk" | "NonCompliant";
-  };
+  notes: string | null;
 }
 
-/**
- * The core "session trustworthiness" action — a Lab Assistant or Custodian confirming that a
- * scheduled class session took place. This IS the CHED-hour crediting step; it happens
- * independently of any student workstation activity.
- */
-export function confirmSession(payload: ConfirmSessionPayload) {
-  return apiRequest<ConfirmSessionResult>("/api/sessionconfirmations", {
-    method: "POST",
-    body: payload,
-  });
+export function getFacultyOptions(sectionId?: number) {
+  const qs = sectionId ? `?sectionId=${sectionId}` : "";
+  return apiRequest<FacultyOption[]>(`/api/sessionconfirmations/faculty${qs}`);
+}
+
+export function getConfirmationsBySection(sectionId: number) {
+  return apiRequest<ConfirmationRow[]>(`/api/sessionconfirmations/by-section/${sectionId}`);
+}
+
+export function facultyConfirm(payload: { sectionId: number; sessionDate: string; facultyId: string; pin: string }) {
+  return apiRequest<{ confirmationId: number; sessionDate: string; hoursCredited: number }>(
+    "/api/sessionconfirmations/faculty-confirm",
+    { method: "POST", body: payload, keepSessionOn401: true },
+  );
+}
+
+export function finalConfirm(confirmationId: number, notes?: string) {
+  return apiRequest<{ confirmationId: number; hoursCredited: number; compliance: Compliance }>(
+    `/api/sessionconfirmations/${confirmationId}/final-confirm`,
+    { method: "POST", body: { notes } },
+  );
+}
+
+export function createVirtualSession(payload: { sectionId: number; sessionDate: string; hoursCredited: number; notes?: string }) {
+  return apiRequest<{ confirmationId: number; hoursCredited: number; compliance: Compliance }>(
+    "/api/sessionconfirmations/virtual",
+    { method: "POST", body: payload },
+  );
 }

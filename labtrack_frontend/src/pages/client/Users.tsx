@@ -170,6 +170,7 @@ function CreateAccountModal({ onClose, onCreated }: { onClose: () => void; onCre
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("Student");
+  const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -177,7 +178,7 @@ function CreateAccountModal({ onClose, onCreated }: { onClose: () => void; onCre
     setError(null);
     setIsSubmitting(true);
     try {
-      await adminCreateUser({ firstName, middleName: middleName || undefined, lastName, schoolId, email, password, role });
+      await adminCreateUser({ firstName, middleName: middleName || undefined, lastName, schoolId, email, password, role, pin: role === "Faculty" ? pin : undefined });
       onCreated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to create account.");
@@ -223,6 +224,12 @@ function CreateAccountModal({ onClose, onCreated }: { onClose: () => void; onCre
             ))}
           </select>
         </div>
+
+        {role === "Faculty" && (
+          <div className="mt-3">
+            <Input label="Confirmation PIN (4 to 6 digits)" value={pin} onChange={(v) => setPin(v.replace(/\D/g, "").slice(0, 6))} type="password" mono />
+          </div>
+        )}
 
         {error && (
           <div className="mt-3 flex items-center gap-1.5 text-[12.5px]" style={{ color: "#b42318" }}>

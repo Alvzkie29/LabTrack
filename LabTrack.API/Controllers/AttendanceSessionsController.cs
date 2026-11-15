@@ -175,4 +175,80 @@ public class AttendanceSessionsController : ControllerBase
 
         return Ok(sessions);
     }
+    /// <summary>
+    /// The login history of one workstation: which student used this PC, for which class, and
+    /// when. Newest first. "from" and "to" are local (Philippine) dates, both inclusive.
+    /// </summary>
+    [HttpGet("by-workstation/{workstationId:int}")]
+    [Authorize(Roles = "LabAssistant,Custodian,Administrator")]
+    public async Task<IActionResult> GetByWorkstation(
+        int workstationId,
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] int limit = 100)
+    {
+        // Philippine time is UTC+8; login times are stored in UTC.
+        const int utcOffsetHours = 8;
+        limit = Math.Clamp(limit, 1, 500);
+
+        var workstation = await _db.Workstations
+            .Where(w => w.WorkstationId == workstationId)
+            .Select(w => new
+            {
+                w.WorkstationId,
+                w.SeatLabel,
+                w.PcIdentifier,
+                Lab = w.Laboratory.RoomCode,
+                w.IsActive
+            })
+            .FirstOrDefaultAsync();
+
+        if (workstation is null) return NotFound("This workstation is not registered in LabTrack.");
+
+        var query = _db.AttendanceSessions.Where(a => a.WorkstationId == workstationId);
+
+        if (from.HasValue)
+        {
+            var fromUtc = from.Value.ToDateTime(TimeOnly.MinValue).AddHours(-utcOffsetHours);
+            query = query.Where(a => a.LoginTime >= fromUtc);
+        }
+        if (to.HasValue)
+        {
+            var toUtc = to.Value.AddDays(1).ToDateTime(TimeOnly.MinValue).AddHours(-utcOffsetHours);
+            query = query.Where(a => a.LoginTime < toUtc);
+        }
+
+        var total = await query.CountAsync();
+
+        var logins = await query
+            .OrderByDescending(a => a.LoginTime)
+            .Take(limit)
+            .Select(a => new
+            {
+                a.AttendanceId,
+                Student = a.Student.FirstName + " " + a.Student.LastName,
+                a.Student.SchoolId,
+                Section = a.CourseSection.SectionCode,
+                SubjectCode = a.CourseSection.Subject.Code,
+                a.LoginTime,
+                a.Notes
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            Workstation = workstation,
+            Total = total,
+            Logins = logins.Select(l => new
+            {
+                l.AttendanceId,
+                l.Student,
+                l.SchoolId,
+                l.Section,
+                l.SubjectCode,
+                LoginTime = l.LoginTime.AddHours(utcOffsetHours),
+                l.Notes
+            })
+        });
+    }
 }

@@ -1,99 +1,61 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { PCStatusDot } from "@/components/StatusBadge";
-import { useRole } from "@/contexts/RoleContext";
-import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
-import { useLabBlueprint } from "@/utils/hooks/useLabBlueprint";
-import { Send, Monitor, MonitorOff, Activity } from "lucide-react";
-
-type PCStatus = "Active" | "Idle" | "Offline";
+import { Monitor, MonitorOff, X } from "lucide-react";
+import { getLaboratories, getLabWorkstations, type LaboratorySummary, type WorkstationEntry } from "@/api/laboratories";
+import { getWorkstationLogins, type WorkstationLoginHistory } from "@/api/attendance";
+import { ApiError } from "@/api/client";
 
 const INK = "#0d1117";
 const MUTED = "#57606a";
 const BORDER = "#d1d9e0";
 const MAROON = "#800000";
 
-const TILE_TONE: Record<PCStatus, { bg: string; icon: string; ring: string; label: string }> = {
-  Active: { bg: "#fbeeee", icon: MAROON, ring: "rgba(128,0,0,0.18)", label: "active" },
-  Idle: { bg: "#fdf8ea", icon: "#8a6d1a", ring: "rgba(138,109,26,0.18)", label: "idle" },
-  Offline: { bg: "#f6f8fa", icon: "#8c959f", ring: "transparent", label: "offline" },
-};
-
 export function WorkstationsPage() {
-  const { role } = useRole();
   const [searchParams] = useSearchParams();
   const labFromSearch = searchParams.get("lab");
 
   const [labs, setLabs] = useState<LaboratorySummary[]>([]);
   const [activeLabId, setActiveLabId] = useState<number | null>(labFromSearch ? Number(labFromSearch) : null);
+  const [workstations, setWorkstations] = useState<WorkstationEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   useEffect(() => {
     getLaboratories().then((res) => {
       setLabs(res);
-      if (!activeLabId && res.length > 0) setActiveLabId(res[0].labId);
+      setActiveLabId((current) => current ?? res[0]?.labId ?? null);
+      if (res.length === 0) setIsLoading(false);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (labFromSearch) setActiveLabId(Number(labFromSearch));
-  }, [labFromSearch]);
+    if (!activeLabId) return;
+    setIsLoading(true);
+    setSelectedId(null); // the selected PC belongs to the lab we are leaving
+    getLabWorkstations(activeLabId)
+      .then(setWorkstations)
+      .catch(() => setWorkstations([]))
+      .finally(() => setIsLoading(false));
+  }, [activeLabId]);
 
-  const { workstations, labName, isLoading } = useLabBlueprint(activeLabId);
   const activeLab = labs.find((l) => l.labId === activeLabId);
-
-  const counts = useMemo(
-    () =>
-      workstations.reduce(
-        (acc, w) => {
-          acc[w.status] = (acc[w.status] ?? 0) + 1;
-          return acc;
-        },
-        { Active: 0, Idle: 0, Offline: 0 } as Record<PCStatus, number>,
-      ),
-    [workstations],
-  );
-
-  const sortedWorkstations = useMemo(
+  const sorted = useMemo(
     () => [...workstations].sort((a, b) => a.seatLabel.localeCompare(b.seatLabel, undefined, { numeric: true })),
     [workstations],
   );
 
   return (
     <div className="space-y-5">
-      {/* Page header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="font-mono text-[11px] uppercase tracking-wider" style={{ color: MUTED }}>
-            {isLoading ? "Loading..." : "Live"}
-          </div>
-          <h1 className="mt-1" style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4 }}>
-            Workstations
-          </h1>
-          <p className="mt-0.5 text-[13px]" style={{ color: MUTED }}>
-            Real-time seat-level view of every laboratory workstation, updated live via network heartbeat.
-          </p>
+      <div>
+        <div className="font-mono text-[11px] uppercase tracking-wider" style={{ color: MUTED }}>
+          {isLoading ? "Loading..." : "Registered PCs"}
         </div>
-
-        {role === "LabAssistant" && (
-          <button
-            type="button"
-            onClick={() => alert("Issue flagged and logged for Custodian review (prototype).")}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium"
-            style={{ background: MAROON, color: "#F4C430" }}
-          >
-            <Send className="size-3.5" /> Flag issue
-          </button>
-        )}
+        <h1 className="mt-1" style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4 }}>Workstations</h1>
+        <p className="mt-0.5 text-[13px]" style={{ color: MUTED }}>
+          The PCs registered in each laboratory. Select a PC to see every student login recorded on it.
+        </p>
       </div>
 
-      <div className="flex items-center gap-4 text-[12px]">
-        <Legend label="Active" n={counts.Active} kind="Active" />
-        <Legend label="Idle" n={counts.Idle} kind="Idle" />
-        <Legend label="Offline" n={counts.Offline} kind="Offline" />
-      </div>
-
-      {/* Lab tabs */}
       <div
         className="flex flex-wrap gap-1 rounded-md p-1"
         style={{ background: "#ffffff", border: `1px solid ${BORDER}`, width: "fit-content" }}
@@ -117,35 +79,46 @@ export function WorkstationsPage() {
         )}
       </div>
 
-      {/* Seating grid */}
       <div style={{ background: "#ffffff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
-        <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid #e1e4e8" }}>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[12px]" style={{ color: INK }}>{labName || activeLab?.name}</span>
-            <span className="text-[12px]" style={{ color: MUTED }}>
-              · {workstations.length} workstations
-            </span>
-          </div>
-          <span className="font-mono text-[10.5px]" style={{ color: MUTED }}>
-            heartbeat ~15s
-          </span>
+        <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid #e1e4e8" }}>
+          <span className="font-mono text-[12px]" style={{ color: INK }}>{activeLab?.name}</span>
+          <span className="text-[12px]" style={{ color: MUTED }}>· {workstations.length} workstations</span>
         </div>
 
         <div className="p-6">
-          <div
-            className="grid gap-3"
-            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}
-          >
-            {sortedWorkstations.map((w) => (
-              <PCTile
-                key={w.workstationId}
-                seatLabel={w.seatLabel}
-                status={w.status}
-                lastHeartbeat={w.lastHeartbeat}
-              />
-            ))}
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+            {sorted.map((w) => {
+              const Icon = w.isActive ? Monitor : MonitorOff;
+              const selected = w.workstationId === selectedId;
+              return (
+                <button
+                  key={w.workstationId}
+                  type="button"
+                  onClick={() => setSelectedId(selected ? null : w.workstationId)}
+                  className="overflow-hidden text-left transition-shadow"
+                  style={{
+                    background: "#ffffff",
+                    border: `1px solid ${selected ? MAROON : BORDER}`,
+                    boxShadow: selected ? `0 0 0 2px #80000022` : "none",
+                    borderRadius: 8,
+                  }}
+                >
+                  <div className="px-2.5 py-1.5" style={{ background: selected ? MAROON : "#f6f8fa", borderBottom: "1px solid #e1e4e8" }}>
+                    <span className="font-mono text-[10.5px] font-semibold" style={{ color: selected ? "#F4C430" : INK }}>
+                      {w.seatLabel}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center justify-center gap-1.5 py-4" style={{ background: w.isActive ? "#fbeeee" : "#f6f8fa" }}>
+                    <Icon className="size-5" style={{ color: w.isActive ? MAROON : "#8c959f" }} />
+                  </div>
+                  <div className="px-2.5 py-1.5 font-mono text-[9.5px]" style={{ borderTop: "1px solid #e1e4e8", color: MUTED }}>
+                    {w.pcIdentifier}{w.isActive ? "" : " · inactive"}
+                  </div>
+                </button>
+              );
+            })}
           </div>
-          {sortedWorkstations.length === 0 && !isLoading && (
+          {sorted.length === 0 && !isLoading && (
             <div className="py-10 text-center text-[13px]" style={{ color: MUTED }}>
               No workstations set up in this lab yet.
             </div>
@@ -153,65 +126,96 @@ export function WorkstationsPage() {
         </div>
       </div>
 
-      <p className="text-[11.5px]" style={{ color: MUTED }}>
-        Note: which course sections are scheduled in a given lab isn't tracked yet — course
-        sections aren't currently linked to a specific laboratory. This view shows live seat
-        status only.
-      </p>
+      {selectedId !== null && <LoginHistory workstationId={selectedId} onClose={() => setSelectedId(null)} />}
     </div>
   );
 }
 
-function PCTile({
-  seatLabel,
-  status,
-  lastHeartbeat,
-}: {
-  seatLabel: string;
-  status: PCStatus;
-  lastHeartbeat: string | null;
-}) {
-  const tone = TILE_TONE[status];
-  const BodyIcon = status === "Offline" ? MonitorOff : Monitor;
+function LoginHistory({ workstationId, onClose }: { workstationId: number; onClose: () => void }) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [data, setData] = useState<WorkstationLoginHistory | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const secondsAgo = lastHeartbeat ? Math.floor((Date.now() - new Date(lastHeartbeat).getTime()) / 1000) : null;
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    getWorkstationLogins(workstationId, { from: from || undefined, to: to || undefined })
+      .then(setData)
+      .catch((e) => setError(e instanceof ApiError ? e.message : "Could not load this PC's logins."))
+      .finally(() => setIsLoading(false));
+  }, [workstationId, from, to]);
+
+  const shown = data?.logins.length ?? 0;
+  const total = data?.total ?? 0;
 
   return (
-    <div className="overflow-hidden transition-colors" style={{ background: "#ffffff", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
-      <div className="flex items-center justify-between px-2.5 py-1.5" style={{ background: "#f6f8fa", borderBottom: "1px solid #e1e4e8" }}>
-        <span className="font-mono text-[10.5px] font-semibold" style={{ color: INK }}>{seatLabel}</span>
-        <PCStatusDot status={status} />
-      </div>
-
-      <div className="flex flex-col items-center justify-center gap-1.5" style={{ background: tone.bg, aspectRatio: "4 / 3" }}>
-        <div className="flex size-9 items-center justify-center rounded-full" style={{ boxShadow: `0 0 0 6px ${tone.ring}`, background: "#ffffff" }}>
-          <BodyIcon className="size-4" style={{ color: tone.icon }} />
-        </div>
-        {status === "Active" && (
-          <span className="flex items-center gap-1 font-mono text-[9px]" style={{ color: tone.icon }}>
-            <Activity className="size-2.5" /> heartbeat
+    <div style={{ background: "#ffffff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5" style={{ borderBottom: "1px solid #e1e4e8" }}>
+        <div>
+          <span className="font-mono text-[12.5px] font-semibold" style={{ color: MAROON }}>
+            {data?.workstation.pcIdentifier ?? "Loading..."}
           </span>
-        )}
+          {data && (
+            <span className="ml-2 text-[12px]" style={{ color: MUTED }}>
+              {data.workstation.seatLabel} · {data.workstation.lab} · {total} login{total === 1 ? "" : "s"} recorded
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From"
+            className="rounded-md px-2 py-1 text-[12px] outline-none" style={{ border: `1px solid ${BORDER}` }} />
+          <span className="text-[12px]" style={{ color: MUTED }}>to</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To"
+            className="rounded-md px-2 py-1 text-[12px] outline-none" style={{ border: `1px solid ${BORDER}` }} />
+          <button type="button" onClick={onClose} aria-label="Close"
+            className="rounded-md p-1.5" style={{ border: `1px solid ${BORDER}`, color: MUTED }}>
+            <X className="size-3.5" />
+          </button>
+        </div>
       </div>
 
-      <div className="flex items-center justify-between px-2.5 py-1.5" style={{ borderTop: "1px solid #e1e4e8" }}>
-        <span className="font-mono text-[9.5px]" style={{ color: MUTED }}>
-          {status === "Offline" ? "offline" : `${tone.label}`}
-        </span>
-        <span className="font-mono text-[9px]" style={{ color: "#8c959f" }}>
-          {secondsAgo !== null ? `${secondsAgo}s ago` : "—"}
-        </span>
-      </div>
-    </div>
-  );
-}
+      {error && <div className="px-4 py-3 text-[12.5px]" style={{ color: "#b42318" }}>{error}</div>}
 
-function Legend({ label, n, kind }: { label: string; n: number; kind: PCStatus }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <PCStatusDot status={kind} />
-      <span style={{ color: "#57606a" }}>{label}</span>
-      <span className="font-mono" style={{ color: "#0d1117" }}>{n}</span>
+      <table className="w-full text-[12.5px]">
+        <thead>
+          <tr style={{ background: "#f6f8fa", color: MUTED }}>
+            {["When", "Student", "School ID", "Class", "Notes"].map((h, i) => (
+              <th key={h} className={`py-2 text-left font-mono text-[10.5px] uppercase tracking-wider ${i === 0 ? "pl-4" : ""}`}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data?.logins.map((l) => (
+            <tr key={l.attendanceId} style={{ borderTop: "1px solid #e1e4e8" }}>
+              <td className="whitespace-nowrap py-2 pl-4 pr-3 font-mono text-[11.5px]" style={{ color: MUTED }}>
+                {new Date(l.loginTime).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+              </td>
+              <td className="py-2 pr-3">{l.student}</td>
+              <td className="py-2 pr-3 font-mono text-[11.5px]">{l.schoolId}</td>
+              <td className="py-2 pr-3 font-mono text-[11.5px]">{l.section} · {l.subjectCode}</td>
+              <td className="py-2 pr-4 text-[11.5px]" style={{ color: MUTED }}>{l.notes ?? "—"}</td>
+            </tr>
+          ))}
+          {data && shown === 0 && (
+            <tr>
+              <td colSpan={5} className="py-8 text-center text-[13px]" style={{ color: MUTED }}>
+                No student has logged in on this PC{from || to ? " in this date range" : " yet"}.
+              </td>
+            </tr>
+          )}
+          {!data && isLoading && (
+            <tr><td colSpan={5} className="py-8 text-center text-[13px]" style={{ color: MUTED }}>Loading...</td></tr>
+          )}
+        </tbody>
+      </table>
+
+      {shown > 0 && shown < total && (
+        <div className="px-4 py-2 text-[11.5px]" style={{ borderTop: "1px solid #e1e4e8", color: MUTED }}>
+          Showing the {shown} most recent of {total}. Narrow the dates to see older logins.
+        </div>
+      )}
     </div>
   );
 }

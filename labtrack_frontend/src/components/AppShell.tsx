@@ -18,6 +18,7 @@ import {
   ShieldAlert,   
   FileSpreadsheet,
   Monitor,
+  Upload,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useRole, type Role, canAccess } from "@/contexts/RoleContext";
@@ -43,11 +44,12 @@ const ALL_NAV: NavItem[] = [
   { to: "/workstation", label: "Workstations", icon: <Monitor className={IC} strokeWidth={1.75} /> },
   { to: "/courses",   label: "Courses",   icon: <BookOpen className={IC} strokeWidth={1.75} /> },
   { to: "/confirm-session",   label: "Confirm Sessions",   icon: <CheckCircle2 className={IC} strokeWidth={1.75} /> },
-  { to: "/flagged-session",   label: "Flagged Sessions",   icon: <ShieldAlert className={IC} strokeWidth={1.75} /> },
+  { to: "/imports",           label: "Import",             icon: <Upload className={IC} strokeWidth={1.75} /> },
   { to: "/at-risk",   label: "At Risk",   icon: <AlertCircle className={IC} strokeWidth={1.75} /> },
   { to: "/attendance-report", label: "Attendance Reports", icon: <FileSpreadsheet className={IC} strokeWidth={1.75} /> },
+  { to: "/audit-log",         label: "Audit Log",          icon: <ShieldAlert className={IC} strokeWidth={1.75} /> },
+  { to: "/compliance-report", label: "Compliance Report", icon: <FileSpreadsheet className={IC} strokeWidth={1.75} /> },
   { to: "/schedule",  label: "Schedule",  icon: <CalendarDays className={IC} strokeWidth={1.75} /> },
-  { to: "/lab-assignments", label: "Lab Assignments", icon: <Briefcase className={IC} strokeWidth={1.75} /> },
   { to: "/users",     label: "Users",     icon: <Users className={IC} strokeWidth={1.75} /> },
 ];
 
@@ -66,6 +68,7 @@ const ROLE_DISPLAY_LABELS: Record<Role, string> = {
   Administrator: "Administrator",
   Custodian: "Laboratory Custodian",
   LabAssistant: "Laboratory Assistant",
+  Faculty: "Faculty",
   Student: "Student",
 };
 
@@ -74,11 +77,12 @@ function labelForPath(pathname: string): string {
   if (pathname.startsWith("/workstation")) return "Workstations";
   if (pathname.startsWith("/courses")) return "Courses";
   if (pathname.startsWith("/confirm-session")) return "Confirm Sessions";
-  if (pathname.startsWith("/flagged-session")) return "Flagged Sessions";
+  if (pathname.startsWith("/imports")) return "Import";
+  if (pathname.startsWith("/compliance-report")) return "Compliance Report";
   if (pathname.startsWith("/at-risk")) return "At Risk";
   if (pathname.startsWith("/attendance-report")) return "Attendance Reports";
   if (pathname.startsWith("/schedule")) return "Schedule";
-  if (pathname.startsWith("/lab-assignments")) return "Lab Assignments";
+  if (pathname.startsWith("/audit-log")) return "Audit Log";
   if (pathname.startsWith("/users")) return "Users";
   if (pathname.startsWith("/settings")) return "Settings";
   return "Page";
@@ -232,7 +236,7 @@ export function AppShell() {
   // Students never belong in the staff shell.
   useEffect(() => {
     if (role === "Student") {
-      navigate("/student-login", { replace: true });
+      navigate("/", { replace: true });
     }
   }, [role, navigate]);
 

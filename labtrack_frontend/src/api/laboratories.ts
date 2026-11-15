@@ -9,26 +9,18 @@ export interface LaboratorySummary {
   workstationCount: number;
 }
 
-export interface WorkstationBlueprintEntry {
+export interface WorkstationEntry {
   workstationId: number;
   seatLabel: string;
-  deviceIdentifier: string;
-  status: "Offline" | "Active" | "Idle";
-  lastHeartbeat: string | null;
-}
-
-export interface LabBlueprint {
-  labId: number;
-  name: string;
-  roomCode: string;
-  capacity: number;
-  workstations: WorkstationBlueprintEntry[];
+  pcIdentifier: string;
+  isActive: boolean;
 }
 
 export function getLaboratories() {
   return apiRequest<LaboratorySummary[]>("/api/laboratories");
 }
 
-export function getLabBlueprint(labId: number) {
-  return apiRequest<LabBlueprint>(`/api/laboratories/${labId}/blueprint`);
+/** The registered PCs of one lab (the seating list). There is no live status any more. */
+export function getLabWorkstations(labId: number) {
+  return apiRequest<WorkstationEntry[]>(`/api/laboratories/${labId}/workstations`);
 }

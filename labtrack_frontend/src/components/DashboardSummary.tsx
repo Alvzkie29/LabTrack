@@ -55,11 +55,9 @@ function StatCard({
 export function DashboardSummary({
   sections,
   labs,
-  flaggedCount,
 }: {
   sections: CourseSectionSummary[];
   labs: LaboratorySummary[];
-  flaggedCount: number;
 }) {
   const sectionsWithCompliance = sections.filter((s) => s.compliance !== null);
   const avgCompliance = sectionsWithCompliance.length
@@ -79,16 +77,10 @@ export function DashboardSummary({
 
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
       <StatCard label="Avg compliance rate" value={`${avgCompliance}%`} icon={Gauge} />
       <StatCard label="At-risk sections" value={String(atRiskCount)} icon={AlertCircle} tone={atRiskCount > 0 ? "warning" : "neutral"} />
       <StatCard label="Laboratories" value={String(labs.length)} icon={Building2} />
-      <StatCard
-        label="Flagged sessions"
-        value={String(flaggedCount)}
-        icon={Monitor}
-        tone={flaggedCount > 0 ? "warning" : "neutral"}
-      />
     </div>
   );
 }

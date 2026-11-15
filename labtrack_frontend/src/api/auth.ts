@@ -1,6 +1,6 @@
 import { apiRequest, setToken } from "./client";
 
-export type Role = "Administrator" | "Custodian" | "LabAssistant" | "Student";
+export type Role = "Administrator" | "Custodian" | "LabAssistant" | "Faculty" | "Student";
 
 export interface AuthResponse {
   token: string;
@@ -10,6 +10,7 @@ export interface AuthResponse {
   schoolId: string;
   email?: string | null;
   roles: Role[];
+  mustChangePassword?: boolean;
 }
 
 export interface LoginPayload {
@@ -26,6 +27,7 @@ export interface RegisterPayload {
   email: string;
   password: string;
   role: Role;
+  pin?: string; // Faculty only, 4 to 6 digits
   supervisingCustodianId?: string;
 }
 

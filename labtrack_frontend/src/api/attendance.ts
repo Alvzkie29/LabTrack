@@ -1,42 +1,10 @@
 import { apiRequest } from "./client";
 
-export interface AttendanceLoginResult {
-  attendanceId: number;
-  loginTime: string;
-}
-
-export interface AttendanceLogoutResult {
-  attendanceId: number;
-  logoutTime: string;
-  activityScore: number | null;
-  presenceStatus: string | null;
-}
-
 export interface MyAttendanceRow {
   attendanceId: number;
   section: string;
   workstation: string;
   loginTime: string;
-  logoutTime: string | null;
-  activityScore: number | null;
-}
-
-/**
- * Records a student login at a specific workstation for a specific course section.
- * Requires the student to already be authenticated (call auth login first) — this is
- * the separate workstation/attendance layer, not the account login itself.
- */
-export function loginAttendance(workstationId: number, sectionId: number) {
-  return apiRequest<AttendanceLoginResult>("/api/attendancesessions/login", {
-    method: "POST",
-    body: { workstationId, sectionId },
-  });
-}
-
-export function logoutAttendance(attendanceId: number) {
-  return apiRequest<AttendanceLogoutResult>(`/api/attendancesessions/${attendanceId}/logout`, {
-    method: "POST",
-  });
 }
 
 export function getMyAttendance() {
@@ -49,25 +17,18 @@ export interface AttendanceReportRow {
   studentSchoolId: string;
   section: string;
   workstation: string;
+  pcIdentifier: string;
   loginTime: string;
-  logoutTime: string | null;
-  activityScore: number | null;
-  presenceStatus: string | null;
-  isReviewed: boolean;
-  reviewOutcome: string | null;
+  notes: string | null;
 }
 
 export interface AttendanceReportFilters {
   sectionId?: number;
   labId?: number;
-  from?: string; // ISO date
-  to?: string; // ISO date
+  from?: string;
+  to?: string;
 }
 
-/**
- * Real filtered record set for reporting/export — there is no separate submission or
- * review workflow in the backend; this query result is the report.
- */
 export function getAttendanceReport(filters: AttendanceReportFilters) {
   const params = new URLSearchParams();
   if (filters.sectionId) params.set("sectionId", String(filters.sectionId));
@@ -78,38 +39,80 @@ export function getAttendanceReport(filters: AttendanceReportFilters) {
   return apiRequest<AttendanceReportRow[]>(`/api/attendancesessions/report${qs ? `?${qs}` : ""}`);
 }
 
-export interface FlaggedSessionRow {
+export interface LoginRow {
+  attendanceId: number;
+  studentId: string;
+  schoolId: string;
+  name: string;
+  workstation: string;
+  pcIdentifier: string;
+  loginTime: string;
+  notes: string | null;
+}
+
+export interface AbsentRow {
+  studentId: string;
+  schoolId: string;
+  name: string;
+}
+
+export interface SectionAttendance {
+  section: {
+    sectionId: number;
+    sectionCode: string;
+    subjectCode: string;
+    subjectTitle: string;
+    meetings: { startTime: string; endTime: string; lab: string }[];
+  };
+  date: string;
+  rosterCount: number;
+  presentCount: number;
+  absentCount: number;
+  present: LoginRow[];
+  absent: AbsentRow[];
+  notOnRoster: LoginRow[];
+}
+
+export function getSectionAttendance(sectionId: number, date?: string) {
+  const qs = date ? `?date=${date}` : "";
+  return apiRequest<SectionAttendance>(`/api/attendancesessions/by-section/${sectionId}${qs}`);
+}
+
+export interface AttendanceDay {
+  date: string;
+  presentCount: number;
+  rosterCount: number;
+  workstations: number; // active PCs in the lab(s) the class met in that day
+  confirmed: boolean;
+  hoursCredited: number | null;
+}
+
+/** One row per class day that has at least one login. */
+export function getAttendanceHistory(sectionId: number) {
+  return apiRequest<AttendanceDay[]>(`/api/attendancesessions/by-section/${sectionId}/history`);
+}
+
+export interface WorkstationLogin {
   attendanceId: number;
   student: string;
-  studentSchoolId: string;
-  workstation: string;
-  section: string;
-  compositeScore: number;
-  loginTime: string;
-  logoutTime: string | null;
+  schoolId: string;
+  section: string;     // the class code
+  subjectCode: string;
+  loginTime: string;   // Philippine time
+  notes: string | null;
 }
 
-export function getFlaggedSessions() {
-  return apiRequest<FlaggedSessionRow[]>("/api/attendancesessions/flagged");
+export interface WorkstationLoginHistory {
+  workstation: { workstationId: number; seatLabel: string; pcIdentifier: string; lab: string; isActive: boolean };
+  total: number;
+  logins: WorkstationLogin[];
 }
 
-export type ReviewOutcome = 0 | 1; // 0 = Accepted, 1 = Rejected
-
-export interface ReviewSessionResult {
-  attendanceId: number;
-  isReviewed: boolean;
-  reviewOutcome: ReviewOutcome;
-  reviewedAt: string;
-}
-
-/**
- * Records a human decision on a flagged session. Never affects CHED-hour crediting — that's
- * independent, at the SessionConfirmation level. This only resolves the flag for monitoring
- * purposes and is written to the audit log server-side.
- */
-export function reviewSession(attendanceId: number, outcome: ReviewOutcome, notes?: string) {
-  return apiRequest<ReviewSessionResult>(`/api/attendancesessions/${attendanceId}/review`, {
-    method: "POST",
-    body: { outcome, notes },
-  });
+/** Every student login recorded on one PC, newest first. Dates are yyyy-mm-dd. */
+export function getWorkstationLogins(workstationId: number, opts: { from?: string; to?: string } = {}) {
+  const params = new URLSearchParams();
+  if (opts.from) params.set("from", opts.from);
+  if (opts.to) params.set("to", opts.to);
+  const qs = params.toString();
+  return apiRequest<WorkstationLoginHistory>(`/api/attendancesessions/by-workstation/${workstationId}${qs ? `?${qs}` : ""}`);
 }

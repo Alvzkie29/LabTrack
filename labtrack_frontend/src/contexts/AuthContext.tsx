@@ -4,7 +4,7 @@ import { getToken } from "../api/client";
 
 export type { Role };
 
-export const ROLES: Role[] = ["Administrator", "Custodian", "LabAssistant", "Student"];
+export const ROLES: Role[] = ["Administrator", "Custodian", "LabAssistant", "Faculty", "Student"];
 export const STAFF_ROLES: Role[] = ["Administrator", "Custodian", "LabAssistant"];
 
 // Human-readable labels for display purposes — internal Role values stay backend-exact.
@@ -12,6 +12,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   Administrator: "Administrator",
   Custodian: "Laboratory Custodian",
   LabAssistant: "Laboratory Assistant",
+  Faculty: "Faculty",
   Student: "Student",
 };
 
@@ -24,11 +25,10 @@ const PERMISSIONS: Record<Role, string[]> = {
     "/courses",
     "/at-risk",
     "/schedule",
-    "/lab-assignments",
-    "/flagged-session",
-    "/confirm-session",
+    
+    "/confirm-session", "/imports",
     "/attendance-report",
-    "/users",
+    "/compliance-report", "/audit-log", "/users",
     "/settings",
   ],
   Custodian: [
@@ -37,20 +37,20 @@ const PERMISSIONS: Record<Role, string[]> = {
     "/courses",
     "/at-risk",
     "/schedule",
-    "/lab-assignments",
-    "/flagged-session",
-    "/confirm-session",
-    "/attendance-report",
+    
+    "/confirm-session", "/imports",
+    "/attendance-report", "/compliance-report", "/audit-log",
     "/settings",
   ],
   LabAssistant: [
     "/dashboard",
     "/workstation",
     "/schedule",
-    "/confirm-session",
+    "/confirm-session", "/imports",
     "/attendance-report",
     "/settings",
   ],
+  Faculty: [],
   Student: [],
 };
 
