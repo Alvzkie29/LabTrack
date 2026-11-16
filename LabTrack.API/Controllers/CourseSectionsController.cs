@@ -100,6 +100,85 @@ public class CourseSectionsController : ControllerBase
         }));
     }
 
+    /// <summary>
+    /// Mean workstation utilization per class (Equations 2 and 3 of the paper). For each
+    /// finally confirmed physical session: workstations that recorded a student login that
+    /// day, divided by the active workstations in the laboratory the class met in that day.
+    /// The class figure is the average of its sessions. Virtual sessions use no workstations
+    /// and are left out.
+    /// </summary>
+    [HttpGet("utilization")]
+    [Authorize(Roles = "LabAssistant,Custodian,Administrator")]
+    public async Task<IActionResult> GetUtilization([FromQuery] int? ayId, [FromQuery] int? labId)
+    {
+        // Philippine time is UTC+8; login times are stored in UTC.
+        const int utcOffsetHours = 8;
+
+        var sectionQuery = _db.CourseSections.AsQueryable();
+        if (ayId.HasValue) sectionQuery = sectionQuery.Where(c => c.AyId == ayId.Value);
+        if (labId.HasValue) sectionQuery = sectionQuery.Where(c => c.Schedules.Any(m => m.LabId == labId.Value));
+        var sectionIds = await sectionQuery.Select(c => c.SectionId).ToListAsync();
+
+        var confirmed = await _db.SessionConfirmations
+            .Where(sc => sectionIds.Contains(sc.SectionId)
+                         && sc.SessionType == SessionType.Physical
+                         && sc.FinalConfirmedAt != null)
+            .Select(sc => new { sc.SectionId, sc.SessionDate })
+            .ToListAsync();
+
+        var logins = await _db.AttendanceSessions
+            .Where(a => sectionIds.Contains(a.SectionId))
+            .Select(a => new { a.SectionId, a.WorkstationId, a.LoginTime })
+            .ToListAsync();
+
+        // (class, local date) -> how many different workstations were used
+        var usedPcs = logins
+            .GroupBy(l => (l.SectionId, Date: DateOnly.FromDateTime(l.LoginTime.AddHours(utcOffsetHours))))
+            .ToDictionary(g => g.Key, g => g.Select(l => l.WorkstationId).Distinct().Count());
+
+        var meetings = await _db.SectionSchedules
+            .Where(m => sectionIds.Contains(m.SectionId))
+            .Select(m => new { m.SectionId, m.DayOfWeek, m.LabId })
+            .ToListAsync();
+
+        var activePcsByLab = await _db.Workstations
+            .Where(w => w.IsActive)
+            .GroupBy(w => w.LabId)
+            .Select(g => new { LabId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.LabId, x => x.Count);
+
+        var result = sectionIds.Select(sectionId =>
+        {
+            var rates = new List<decimal>();
+
+            foreach (var session in confirmed.Where(c => c.SectionId == sectionId))
+            {
+                var date = DateOnly.FromDateTime(session.SessionDate);
+                var weekday = date.DayOfWeek.ToString();
+
+                // N(s): active PCs in the lab(s) this class meets in on that weekday
+                var available = meetings
+                    .Where(m => m.SectionId == sectionId && m.DayOfWeek == weekday)
+                    .Select(m => m.LabId)
+                    .Distinct()
+                    .Sum(id => activePcsByLab.GetValueOrDefault(id));
+                if (available == 0) continue;
+
+                var used = usedPcs.GetValueOrDefault((sectionId, date));
+                rates.Add(Math.Min(100m, used * 100m / available)); // R(s)
+            }
+
+            return new
+            {
+                SectionId = sectionId,
+                ConfirmedSessions = rates.Count,
+                UtilizationPercent = rates.Count > 0 ? (decimal?)Math.Round(rates.Average(), 1) : null // R(c)
+            };
+        });
+
+        return Ok(result);
+    }
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id)
     {

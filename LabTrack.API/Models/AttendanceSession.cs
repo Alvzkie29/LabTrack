@@ -21,6 +21,8 @@ public class AttendanceSession
     public CourseSection CourseSection { get; set; } = null!;
 
     public DateTime LoginTime { get; set; } = DateTime.UtcNow;
+    /// <summary>Set only for records captured by a Master PC while the server was unreachable. Prevents duplicates on sync.</summary>
+    public Guid? OfflineId { get; set; }
 
     /// <summary>Clarifying note added by the Lab Assistant or Custodian (e.g. changed workstation).</summary>
     [MaxLength(500)]

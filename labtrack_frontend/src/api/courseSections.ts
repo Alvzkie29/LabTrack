@@ -60,3 +60,18 @@ export function updateSectionFaculty(sectionId: number, facultyId: string | null
     { method: "PATCH", body: { facultyId } },
   );
 }
+
+export interface SectionUtilization {
+  sectionId: number;
+  confirmedSessions: number;        // physical sessions with final confirmation
+  utilizationPercent: number | null; // mean workstation occupancy; null when there are none yet
+}
+
+/** Mean workstation utilization per class, over its finally confirmed physical sessions. */
+export function getSectionUtilization(params?: { ayId?: number; labId?: number }) {
+  const query = new URLSearchParams();
+  if (params?.ayId) query.set("ayId", String(params.ayId));
+  if (params?.labId) query.set("labId", String(params.labId));
+  const qs = query.toString();
+  return apiRequest<SectionUtilization[]>(`/api/coursesections/utilization${qs ? `?${qs}` : ""}`);
+}

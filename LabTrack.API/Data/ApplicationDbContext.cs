@@ -158,6 +158,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey(a => a.SectionId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Entity<AttendanceSession>()
+            .HasIndex(a => a.OfflineId)
+            .IsUnique();
+
         // ---- Audit Log ----
         builder.Entity<AuditLog>()
             .HasOne(a => a.User)

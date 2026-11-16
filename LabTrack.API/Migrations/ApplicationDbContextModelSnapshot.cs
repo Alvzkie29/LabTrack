@@ -167,6 +167,9 @@ namespace LabTrack.API.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<Guid?>("OfflineId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("SectionId")
                         .HasColumnType("int");
 
@@ -178,6 +181,10 @@ namespace LabTrack.API.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("AttendanceId");
+
+                    b.HasIndex("OfflineId")
+                        .IsUnique()
+                        .HasFilter("[OfflineId] IS NOT NULL");
 
                     b.HasIndex("SectionId");
 

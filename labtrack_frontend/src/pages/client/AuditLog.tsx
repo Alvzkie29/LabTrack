@@ -14,6 +14,7 @@ const ACTIONS: { value: string; label: string }[] = [
   { value: "UserLoggedIn", label: "Login" },
   { value: "PasswordChanged", label: "Password changed" },
   { value: "UserCreated", label: "Account created" },
+  { value: "WorkstationStaffUnlocked", label: "Staff unlocked a PC" },
 ];
 const labelFor = (action: string) => ACTIONS.find((a) => a.value === action)?.label ?? action;
 

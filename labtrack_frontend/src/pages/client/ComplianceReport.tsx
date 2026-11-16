@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Printer, FileSpreadsheet } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { getAcademicYears, type AcademicYear } from "@/api/academicYears";
-import { getCourseSections, type CourseSectionSummary } from "@/api/courseSections";
+import { getCourseSections, getSectionUtilization, type CourseSectionSummary, type SectionUtilization } from "@/api/courseSections";
 import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
 import { downloadCsv } from "@/utils/csv";
 
@@ -21,6 +21,7 @@ export function ComplianceReportPage() {
   const [ayId, setAyId] = useState<number | "">("");
   const [sections, setSections] = useState<CourseSectionSummary[]>([]);
   const [labs, setLabs] = useState<LaboratorySummary[]>([]);
+  const [utilization, setUtilization] = useState<Record<number, SectionUtilization>>({});
   const [labId, setLabId] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
 
@@ -38,6 +39,9 @@ export function ComplianceReportPage() {
     // A class is counted in a lab when at least one of its meetings is held there.
     getCourseSections({ ayId: Number(ayId), labId: labId || undefined })
       .then(setSections).catch(() => setSections([])).finally(() => setLoading(false));
+    getSectionUtilization({ ayId: Number(ayId), labId: labId || undefined })
+      .then((rows) => setUtilization(Object.fromEntries(rows.map((r) => [r.sectionId, r]))))
+      .catch(() => setUtilization({}));
   }, [ayId, labId]);
 
   const ay = years.find((y) => y.ayId === ayId);
@@ -66,6 +70,12 @@ export function ComplianceReportPage() {
     );
   }
 
+  // "45% (6)" = mean occupancy over 6 confirmed sessions; a dash when none are confirmed yet.
+  const utilizationText = (sectionId: number) => {
+    const u = utilization[sectionId];
+    return u && u.utilizationPercent !== null ? `${Math.round(u.utilizationPercent)}% (${u.confirmedSessions})` : "—";
+  };
+
   const meetings = (r: CourseSectionSummary) =>
     r.meetings.map((m) => `${m.dayOfWeek.slice(0, 3)} ${m.laboratory.roomCode}`).join(", ");
 
@@ -81,6 +91,7 @@ export function ComplianceReportPage() {
         "Confirmed hours": r.compliance?.confirmedHoursTotal ?? "",
         "Hours remaining": r.compliance ? Math.max(0, r.compliance.requiredHours - r.compliance.confirmedHoursTotal) : "",
         Status: r.compliance ? STATUS_LABEL[r.compliance.status] : "",
+        "Utilization % (confirmed sessions)": utilizationText(r.sectionId),
       })),
     );
 
@@ -92,7 +103,8 @@ export function ComplianceReportPage() {
           <h1 className="mt-1" style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4 }}>CHED Compliance Report</h1>
           <p className="mt-0.5 max-w-2xl text-[13px]" style={{ color: MUTED }}>
             Confirmed laboratory hours against the required hours for every class in the semester
-            {labRoom ? ` held in ${labRoom}` : ""}.
+            {labRoom ? ` held in ${labRoom}` : ""}. Utilization is the average share of the laboratory's PCs in use
+            during confirmed physical sessions, with the number of sessions in brackets.
           </p>
         </div>
         <div className="no-print flex items-center gap-2">
@@ -129,7 +141,7 @@ export function ComplianceReportPage() {
         <table className="w-full text-[12.5px]">
           <thead>
             <tr style={{ background: "#f6f8fa", color: MUTED }}>
-              {["Class", "Subject", "Faculty", "Meetings", "Confirmed / Required", "Remaining", "Status"].map((h, i) => (
+              {["Class", "Subject", "Faculty", "Meetings", "Confirmed / Required", "Remaining", "Utilization", "Status"].map((h, i) => (
                 <th key={h} className={`py-2.5 text-left font-mono text-[10.5px] uppercase tracking-wider ${i === 0 ? "pl-4" : ""}`}>{h}</th>
               ))}
             </tr>
@@ -145,12 +157,13 @@ export function ComplianceReportPage() {
                   <td className="py-2 pr-3 font-mono text-[11px]" style={{ color: MUTED }}>{meetings(r)}</td>
                   <td className="py-2 pr-3 font-mono">{c ? `${c.confirmedHoursTotal} / ${c.requiredHours}h` : "—"}</td>
                   <td className="py-2 pr-3 font-mono">{c ? `${Math.max(0, c.requiredHours - c.confirmedHoursTotal)}h` : "—"}</td>
+                  <td className="py-2 pr-3 font-mono">{utilizationText(r.sectionId)}</td>
                   <td className="py-2 pr-4">{c ? STATUS_LABEL[c.status] : "—"}</td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="py-8 text-center text-[13px]" style={{ color: MUTED }}>
+              <tr><td colSpan={8} className="py-8 text-center text-[13px]" style={{ color: MUTED }}>
                 {loading ? "Loading..." : labRoom ? `No classes meet in ${labRoom} this semester.` : "No classes for this semester."}
               </td></tr>
             )}

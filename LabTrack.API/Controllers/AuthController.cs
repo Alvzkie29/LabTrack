@@ -33,7 +33,7 @@ public class AuthController : ControllerBase
     /// unrestricted here for initial setup/testing.
     /// </summary>
     [HttpPost("register")]
-    // [Authorize(Roles = "Administrator")]
+    [Authorize(Roles = "Administrator")]
     public async Task<ActionResult<AuthResponseDto>> Register(RegisterDto dto)
     {
         if (!DbSeeder.Roles.Contains(dto.Role))
