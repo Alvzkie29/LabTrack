@@ -20,16 +20,16 @@ const PERMISSIONS: Record<Role, string[]> = {
   Administrator: [
     "/dashboard", "/workstation", "/courses", "/at-risk", "/schedule",
     "/confirm-session", "/imports",
-    "/attendance-report", "/compliance-report", "/audit-log", "/users", "/settings",
+    "/attendance-report", "/compliance-report", "/audit-log", "/users", "/settings", "/weekly-report", "/class-status", "/make-up-classes", "/academic-years", "/email-reminders",
   ],
   Custodian: [
     "/dashboard", "/workstation", "/courses", "/at-risk", "/schedule",
     "/confirm-session", "/imports",
-    "/attendance-report", "/compliance-report", "/audit-log", "/settings",
+    "/attendance-report", "/compliance-report", "/audit-log", "/settings", "/weekly-report", "/class-status", "/make-up-classes", "/academic-years", "/email-reminders",
   ],
   LabAssistant: [
     "/dashboard", "/workstation", "/schedule", "/confirm-session", "/imports",
-    "/attendance-report", "/settings",
+    "/attendance-report", "/settings", "/class-status", "/make-up-classes",
   ],
   Faculty: [],
   Student: [],

@@ -116,3 +116,17 @@ export function getWorkstationLogins(workstationId: number, opts: { from?: strin
   const qs = params.toString();
   return apiRequest<WorkstationLoginHistory>(`/api/attendancesessions/by-workstation/${workstationId}${qs ? `?${qs}` : ""}`);
 }
+
+/**
+ * Staff record a student as present by hand, for a session where the PC Agent could not
+ * (server and Master PC both unreachable). The note is required and is kept on the record.
+ */
+export function recordManualAttendance(payload: {
+  sectionId: number;
+  studentId: string;
+  date: string; // yyyy-mm-dd
+  workstationId: number;
+  note: string;
+}) {
+  return apiRequest<{ attendanceId: number }>("/api/attendancesessions/manual", { method: "POST", body: payload });
+}

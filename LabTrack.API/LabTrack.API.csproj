@@ -19,11 +19,18 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.5" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Hubs\" />
   </ItemGroup>
+	<ItemGroup>
+		<Compile Remove="App_Data\**" />
+		<Content Remove="App_Data\**" />
+		<None Remove="App_Data\**" />
+		<Watch Remove="App_Data\**" />
+	</ItemGroup>
 
 </Project>

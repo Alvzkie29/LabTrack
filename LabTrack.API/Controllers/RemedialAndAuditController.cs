@@ -1,4 +1,5 @@
 ﻿using LabTrack.Api.Data;
+using LabTrack.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,11 +20,14 @@ public class RemedialRecommendationsController : ControllerBase
     private readonly ApplicationDbContext _db;
     public RemedialRecommendationsController(ApplicationDbContext db) => _db = db;
 
+    /// <summary>The recommendations for a semester's classes (the active semester by default).</summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] int? ayId)
     {
+        var semester = await ayId.OrActiveAsync(_db);
         var recs = await _db.RemedialRecommendations
             .Include(r => r.CourseSection).ThenInclude(c => c.Subject)
+            .Where(r => r.CourseSection.AyId == semester)
             .OrderByDescending(r => r.GeneratedAt)
             .Select(r => new
             {
@@ -286,4 +290,4 @@ public class AuditLogController : ControllerBase
             Timestamp = r.Timestamp.AddHours(UtcOffsetHours)
         }));
     }
-}
+}

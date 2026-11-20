@@ -21,6 +21,11 @@ import { ComplianceReportPage } from "@/pages/client/ComplianceReport";
 import { ImportsPage } from "@/pages/client/Imports";
 import { ConfirmSessionsPage } from "@/pages/client/ConfirmSession";
 import { AttendanceReportsPage } from "@/pages/client/AttendanceReport";
+import { ClassStatusPage } from "@/pages/client/ClassStatus";
+import { WeeklyReportPage } from "@/pages/client/WeeklyReport";
+import { AcademicYearsPage } from "@/pages/client/AcademicYears";
+import { MakeUpClassesPage } from "@/pages/client/MakeUpClasses";
+import { EmailRemindersPage } from "@/pages/client/EmailReminders";
 import { UsersPage } from "@/pages/client/Users";
 import { SettingsPage } from "@/pages/client/Settings";
 
@@ -57,6 +62,11 @@ function App() {
                 <Route path="/imports" element={<ImportsPage />} />
                 <Route path="/confirm-session" element={<ConfirmSessionsPage />} />
                 <Route path="/attendance-report" element={<AttendanceReportsPage />} />
+                <Route path="/class-status" element={<ClassStatusPage />} />
+                <Route path="/weekly-report" element={<WeeklyReportPage />} />
+                <Route path="/academic-years" element={<AcademicYearsPage />} />
+                <Route path="/make-up-classes" element={<MakeUpClassesPage />} />
+                <Route path="/email-reminders" element={<EmailRemindersPage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>

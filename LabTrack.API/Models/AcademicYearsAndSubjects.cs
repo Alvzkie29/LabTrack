@@ -22,6 +22,8 @@ public class AcademicYear
 
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
+    /// <summary>The first day of the 2nd term. Weeks are counted again from here. Null for Summer.</summary>
+    public DateTime? SecondTermStart { get; set; }
 
     /// <summary>Only one Academic Year should be active at a time; used to scope current-term views.</summary>
     public bool IsActive { get; set; } = false;

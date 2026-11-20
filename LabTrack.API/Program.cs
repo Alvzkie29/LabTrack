@@ -6,8 +6,13 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Runs as a Windows service on the server PC (starts with Windows, no Visual Studio needed).
+// When started from Visual Studio it runs normally.
+builder.Host.UseWindowsService();
 
 // ---- Database ----
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -66,6 +71,9 @@ builder.Services.AddAuthorization();
 
 // ---- App services ----
 builder.Services.AddScoped<TokenService>();
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddScoped<ReminderService>();
+builder.Services.AddHostedService<ReminderScheduler>();
 
 // ---- SignalR ----
 builder.Services.AddSignalR();
@@ -139,10 +147,20 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// The dashboard (the React build copied into wwwroot) is served by the API itself, on the same address.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseCors("LabTrackFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Any other address (e.g. /dashboard after a refresh) loads the dashboard, which shows the right page.
+// Unknown /api addresses still answer 404 instead of returning the dashboard.
+app.MapFallback("/api/{**rest}", () => Results.NotFound());
+app.MapFallbackToFile("index.html");
 
 app.Run();

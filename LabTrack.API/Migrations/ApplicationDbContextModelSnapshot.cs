@@ -41,6 +41,9 @@ namespace LabTrack.API.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<DateTime?>("SecondTermStart")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
 
@@ -50,6 +53,28 @@ namespace LabTrack.API.Migrations
                     b.HasKey("AyId");
 
                     b.ToTable("AcademicYears");
+                });
+
+            modelBuilder.Entity("LabTrack.Api.Models.AppSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("AppSettings");
                 });
 
             modelBuilder.Entity("LabTrack.Api.Models.ApplicationUser", b =>
@@ -288,12 +313,19 @@ namespace LabTrack.API.Migrations
                     b.Property<string>("FacultyId")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("LectureRoom")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("SectionCode")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
                     b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TermPart")
                         .HasColumnType("int");
 
                     b.HasKey("SectionId");
@@ -337,6 +369,67 @@ namespace LabTrack.API.Migrations
                     b.ToTable("Laboratories");
                 });
 
+            modelBuilder.Entity("LabTrack.Api.Models.MakeUpClass", b =>
+                {
+                    b.Property<int>("MakeUpId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MakeUpId"));
+
+                    b.Property<string>("AttachmentContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("AttachmentName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("AttachmentStoredName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("LabId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("SectionId")
+                        .HasColumnType("int");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time");
+
+                    b.HasKey("MakeUpId");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("LabId", "Date");
+
+                    b.HasIndex("SectionId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("MakeUpClasses");
+                });
+
             modelBuilder.Entity("LabTrack.Api.Models.RemedialRecommendation", b =>
                 {
                     b.Property<int>("RecommendationId")
@@ -362,6 +455,43 @@ namespace LabTrack.API.Migrations
                     b.HasIndex("SectionId");
 
                     b.ToTable("RemedialRecommendations");
+                });
+
+            modelBuilder.Entity("LabTrack.Api.Models.ReminderLog", b =>
+                {
+                    b.Property<int>("ReminderLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ReminderLogId"));
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("OutstandingHours")
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<int>("SectionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ToEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateOnly>("WeekStart")
+                        .HasColumnType("date");
+
+                    b.HasKey("ReminderLogId");
+
+                    b.HasIndex("WeekStart", "SectionId")
+                        .IsUnique();
+
+                    b.ToTable("ReminderLogs");
                 });
 
             modelBuilder.Entity("LabTrack.Api.Models.SectionEnrollment", b =>
@@ -476,6 +606,43 @@ namespace LabTrack.API.Migrations
                     b.HasIndex("SectionId");
 
                     b.ToTable("SessionConfirmations");
+                });
+
+            modelBuilder.Entity("LabTrack.Api.Models.SessionStatus", b =>
+                {
+                    b.Property<int>("SessionStatusId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SessionStatusId"));
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("SectionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("SessionDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("SessionStatusId");
+
+                    b.HasIndex("SectionId", "SessionDate")
+                        .IsUnique();
+
+                    b.ToTable("SessionStatuses");
                 });
 
             modelBuilder.Entity("LabTrack.Api.Models.Subject", b =>
@@ -772,6 +939,33 @@ namespace LabTrack.API.Migrations
                     b.Navigation("Subject");
                 });
 
+            modelBuilder.Entity("LabTrack.Api.Models.MakeUpClass", b =>
+                {
+                    b.HasOne("LabTrack.Api.Models.ApplicationUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LabTrack.Api.Models.Laboratory", "Laboratory")
+                        .WithMany()
+                        .HasForeignKey("LabId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LabTrack.Api.Models.CourseSection", "CourseSection")
+                        .WithMany("MakeUpClasses")
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CourseSection");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Laboratory");
+                });
+
             modelBuilder.Entity("LabTrack.Api.Models.RemedialRecommendation", b =>
                 {
                     b.HasOne("LabTrack.Api.Models.CourseSection", "CourseSection")
@@ -846,6 +1040,17 @@ namespace LabTrack.API.Migrations
                     b.Navigation("FinalConfirmedByUser");
                 });
 
+            modelBuilder.Entity("LabTrack.Api.Models.SessionStatus", b =>
+                {
+                    b.HasOne("LabTrack.Api.Models.CourseSection", "CourseSection")
+                        .WithMany()
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CourseSection");
+                });
+
             modelBuilder.Entity("LabTrack.Api.Models.Workstation", b =>
                 {
                     b.HasOne("LabTrack.Api.Models.Laboratory", "Laboratory")
@@ -918,6 +1123,8 @@ namespace LabTrack.API.Migrations
                     b.Navigation("AttendanceSessions");
 
                     b.Navigation("Enrollments");
+
+                    b.Navigation("MakeUpClasses");
 
                     b.Navigation("Schedules");
 

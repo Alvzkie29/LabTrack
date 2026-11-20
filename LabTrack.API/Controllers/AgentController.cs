@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using LabTrack.Api.Data;
 using LabTrack.Api.Models;
+using LabTrack.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -117,27 +118,48 @@ public class AgentController : ControllerBase
         return Ok(new { attendance.AttendanceId, AlreadyRecorded = false, Section = ToOption(meeting) });
     }
 
-    /// <summary>The lab meetings happening in this lab today, for classes of the active academic year.</summary>
-    private Task<List<SectionSchedule>> GetTodaysMeetingsAsync(int labId, DateTime now)
+    /// <summary>A class session in this lab today: a regular lab meeting or a make-up class.</summary>
+    private sealed record Slot(int SectionId, CourseSection CourseSection, TimeOnly StartTime, TimeOnly EndTime, bool MakeUp);
+
+    /// <summary>
+    /// The sessions in this lab today, for classes of the active semester: the lab meetings of
+    /// classes running in the current term, plus the make-up classes set for today.
+    /// </summary>
+    private async Task<List<Slot>> GetTodaysMeetingsAsync(int labId, DateTime now)
     {
         var day = now.DayOfWeek.ToString(); // "Monday", same format the meetings are saved in
-        return _db.SectionSchedules
+        var date = DateOnly.FromDateTime(now);
+
+        var meetings = await _db.SectionSchedules
             .Include(m => m.CourseSection).ThenInclude(s => s.Subject)
+            .Include(m => m.CourseSection).ThenInclude(s => s.AcademicYear)
             .Where(m => m.LabId == labId && m.DayOfWeek == day && m.CourseSection.AcademicYear.IsActive)
-            .OrderBy(m => m.StartTime)
             .ToListAsync();
+
+        var makeUps = await _db.MakeUpClasses
+            .Include(m => m.CourseSection).ThenInclude(s => s.Subject)
+            .Where(m => m.LabId == labId && m.Date == date && m.CourseSection.AcademicYear.IsActive)
+            .ToListAsync();
+
+        return meetings
+            .Where(m => m.CourseSection.RunsOn(date)) // a 1st-term class is not offered in the 2nd term, and the other way round
+            .Select(m => new Slot(m.SectionId, m.CourseSection, m.StartTime, m.EndTime, false))
+            .Concat(makeUps.Select(m => new Slot(m.SectionId, m.CourseSection, m.StartTime, m.EndTime, true)))
+            .OrderBy(m => m.StartTime)
+            .ToList();
     }
 
     private Task<bool> MustChangePasswordAsync(string userId) =>
         _db.Users.Where(u => u.Id == userId).Select(u => u.MustChangePassword).FirstOrDefaultAsync();
 
-    private static object ToOption(SectionSchedule m) => new
+    private static object ToOption(Slot m) => new
     {
         m.SectionId,
         m.CourseSection.SectionCode,
         SubjectCode = m.CourseSection.Subject.Code,
-        SubjectTitle = m.CourseSection.Subject.Title,
+        // The agent shows the title; a make-up class says so.
+        SubjectTitle = m.MakeUp ? $"{m.CourseSection.Subject.Title} (make-up class)" : m.CourseSection.Subject.Title,
         m.StartTime,
         m.EndTime
     };
-}
+}

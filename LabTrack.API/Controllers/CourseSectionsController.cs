@@ -24,6 +24,8 @@ public class CreateCourseSectionDto
     public string SectionCode { get; set; } = string.Empty; // the class code, e.g. "3494"
     public string? FacultyId { get; set; }
     public int AyId { get; set; }
+    /// <summary>For a term subject: 1 (1st term) or 2 (2nd term). Null for the whole semester.</summary>
+    public int? TermPart { get; set; }
     public List<MeetingDto> Meetings { get; set; } = new();
 }
 
@@ -74,7 +76,9 @@ public class CourseSectionsController : ControllerBase
             .Include(c => c.Schedules).ThenInclude(m => m.Laboratory)
             .AsQueryable();
 
-        if (ayId.HasValue) query = query.Where(c => c.AyId == ayId.Value);
+        // Without an ayId, the active semester's classes: the pages follow the active semester.
+        var semester = await ayId.OrActiveAsync(_db);
+        query = query.Where(c => c.AyId == semester);
         if (labId.HasValue) query = query.Where(c => c.Schedules.Any(m => m.LabId == labId.Value));
         if (pendingFacultyOnly == true) query = query.Where(c => c.FacultyId == null);
 
@@ -90,6 +94,8 @@ public class CourseSectionsController : ControllerBase
             c.SectionCode,
             Subject = new { c.Subject.SubjectId, c.Subject.Code, c.Subject.Title },
             AcademicYear = c.AcademicYear.Label,
+            c.TermPart,
+            Term = Semesters.TermPartName(c.TermPart),
             c.FacultyId,
             Faculty = c.Faculty?.FullName,
             c.HasInstructorAssigned,
@@ -114,8 +120,8 @@ public class CourseSectionsController : ControllerBase
         // Philippine time is UTC+8; login times are stored in UTC.
         const int utcOffsetHours = 8;
 
-        var sectionQuery = _db.CourseSections.AsQueryable();
-        if (ayId.HasValue) sectionQuery = sectionQuery.Where(c => c.AyId == ayId.Value);
+        var semester = await ayId.OrActiveAsync(_db);
+        var sectionQuery = _db.CourseSections.Where(c => c.AyId == semester);
         if (labId.HasValue) sectionQuery = sectionQuery.Where(c => c.Schedules.Any(m => m.LabId == labId.Value));
         var sectionIds = await sectionQuery.Select(c => c.SectionId).ToListAsync();
 
@@ -141,6 +147,13 @@ public class CourseSectionsController : ControllerBase
             .Select(m => new { m.SectionId, m.DayOfWeek, m.LabId })
             .ToListAsync();
 
+        // A make-up class is held in its own lab.
+        var makeUpLabs = (await _db.MakeUpClasses
+                .Where(m => sectionIds.Contains(m.SectionId))
+                .Select(m => new { m.SectionId, m.Date, m.LabId })
+                .ToListAsync())
+            .ToDictionary(m => (m.SectionId, m.Date), m => m.LabId);
+
         var activePcsByLab = await _db.Workstations
             .Where(w => w.IsActive)
             .GroupBy(w => w.LabId)
@@ -156,12 +169,15 @@ public class CourseSectionsController : ControllerBase
                 var date = DateOnly.FromDateTime(session.SessionDate);
                 var weekday = date.DayOfWeek.ToString();
 
-                // N(s): active PCs in the lab(s) this class meets in on that weekday
-                var available = meetings
-                    .Where(m => m.SectionId == sectionId && m.DayOfWeek == weekday)
-                    .Select(m => m.LabId)
-                    .Distinct()
-                    .Sum(id => activePcsByLab.GetValueOrDefault(id));
+                // N(s): active PCs in the lab(s) this class meets in on that weekday, or in the
+                // make-up class's lab on a make-up date
+                var available = makeUpLabs.TryGetValue((sectionId, date), out var makeUpLab)
+                    ? activePcsByLab.GetValueOrDefault(makeUpLab)
+                    : meetings
+                        .Where(m => m.SectionId == sectionId && m.DayOfWeek == weekday)
+                        .Select(m => m.LabId)
+                        .Distinct()
+                        .Sum(id => activePcsByLab.GetValueOrDefault(id));
                 if (available == 0) continue;
 
                 var used = usedPcs.GetValueOrDefault((sectionId, date));
@@ -200,7 +216,14 @@ public class CourseSectionsController : ControllerBase
             section.SectionId,
             section.SectionCode,
             Subject = new { section.Subject.SubjectId, section.Subject.Code, section.Subject.Title, section.Subject.RequiredHours, section.Subject.TermWeeks },
-            AcademicYear = new { section.AcademicYear.Label, section.AcademicYear.StartDate, section.AcademicYear.EndDate },
+            AcademicYear = new { section.AcademicYear.Label, section.AcademicYear.StartDate, section.AcademicYear.EndDate, section.AcademicYear.SecondTermStart },
+            section.TermPart,
+            Term = Semesters.TermPartName(section.TermPart),
+            MakeUps = await _db.MakeUpClasses
+                .Where(m => m.SectionId == id)
+                .OrderBy(m => m.Date)
+                .Select(m => new { m.MakeUpId, m.Date, m.StartTime, m.EndTime, m.LabId, Laboratory = m.Laboratory.Name, m.Laboratory.RoomCode, m.Reason })
+                .ToListAsync(),
             section.FacultyId,
             Faculty = section.Faculty?.FullName,
             section.HasInstructorAssigned,
@@ -282,6 +305,7 @@ public class CourseSectionsController : ControllerBase
             SectionCode = dto.SectionCode,
             FacultyId = dto.FacultyId,
             AyId = dto.AyId,
+            TermPart = dto.TermPart is 1 or 2 ? dto.TermPart : null,
             Schedules = schedules
         };
         _db.CourseSections.Add(section);
@@ -357,10 +381,12 @@ public class CourseSectionsController : ControllerBase
         var startCol = Col("starttime", "start");
         var endCol = Col("endtime", "end");
         var labCol = Col("lab", "laboratory", "room", "roomcode");
+        var lectureRoomCol = Col("lectureroom", "virtuallab");
 
         if (new[] { classCol, subjectCol, dayCol, startCol, endCol, labCol }.Any(c => c < 0))
             return BadRequest("The CSV needs a header row with: ClassCode, SubjectCode, Day, StartTime, EndTime, Lab. " +
-                              "Description, Units and Term are used when a subject has to be created.");
+                              "Term (1st Term, 2nd Term or Sem) sets which half of the semester a class runs in. " +
+                              "Description and Units are used when a subject has to be created. LectureRoom is optional.");
 
         var labByKey = (await _db.Laboratories.ToListAsync())
             .GroupBy(l => NormalizeKey(l.RoomCode)).ToDictionary(g => g.Key, g => g.First());
@@ -462,6 +488,14 @@ public class CourseSectionsController : ControllerBase
                     continue;
                 }
             }
+            // The term a term class runs in ("1st Term" or "2nd Term"); a semestral class runs all semester.
+            if (Cell(termCol).Length > 0)
+                section.TermPart = subject.TermWeeks >= 18 ? null : Semesters.ParseTermPart(Cell(termCol));
+
+            // The class's lecture room, when the file has one.
+            var lectureRoom = Cell(lectureRoomCol);
+            if (lectureRoom.Length > 0)
+                section.LectureRoom = lectureRoom.Length > 30 ? lectureRoom[..30] : lectureRoom;
 
             // Add the lab meeting unless the class already has it.
             var dayName = day.ToString();
@@ -701,4 +735,4 @@ public class CourseSectionsController : ControllerBase
         cells.Add(current.ToString());
         return cells;
     }
-}
+}

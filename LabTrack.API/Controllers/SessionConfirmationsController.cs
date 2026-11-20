@@ -108,7 +108,9 @@ public class SessionConfirmationsController : ControllerBase
     [Authorize(Roles = "LabAssistant,Custodian,Administrator")]
     public async Task<IActionResult> FacultyConfirm(FacultyConfirmDto dto)
     {
-        var section = await _db.CourseSections.FindAsync(dto.SectionId);
+        var section = await _db.CourseSections
+            .Include(c => c.AcademicYear)
+            .FirstOrDefaultAsync(c => c.SectionId == dto.SectionId);
         if (section is null) return BadRequest("SectionId does not exist.");
 
         var faculty = await _userManager.FindByIdAsync(dto.FacultyId);
@@ -141,14 +143,19 @@ public class SessionConfirmationsController : ControllerBase
             sc.SectionId == dto.SectionId && sc.SessionDate == date && sc.SessionType == SessionType.Physical);
         if (exists) return BadRequest("This session already has a confirmation.");
 
-        // Hours come from the lab meeting(s) this class has on that weekday.
+        // Hours come from the lab meeting(s) this class has on that weekday, when the class runs in
+        // that term, plus a make-up class set for that date.
         var weekday = date.DayOfWeek.ToString();
-        var meetings = await _db.SectionSchedules
-            .Where(m => m.SectionId == dto.SectionId && m.DayOfWeek == weekday)
-            .ToListAsync();
-        if (meetings.Count == 0)
-            return BadRequest("This class has no lab meeting on that day of the week.");
-        var hours = (decimal)meetings.Sum(m => (m.EndTime - m.StartTime).TotalHours);
+        var day = DateOnly.FromDateTime(date);
+        var meetings = section.RunsOn(day)
+            ? await _db.SectionSchedules.Where(m => m.SectionId == dto.SectionId && m.DayOfWeek == weekday).ToListAsync()
+            : new List<SectionSchedule>();
+        var makeUp = await _db.MakeUpClasses.FirstOrDefaultAsync(m => m.SectionId == dto.SectionId && m.Date == day);
+        if (meetings.Count == 0 && makeUp is null)
+            return BadRequest(section.RunsOn(day)
+                ? "This class has no lab meeting or make-up class on that date."
+                : $"This class runs in the {Semesters.TermPartName(section.TermPart)} only, and has no make-up class on that date.");
+        var hours = (decimal)meetings.Sum(m => (m.EndTime - m.StartTime).TotalHours) + (makeUp?.Hours ?? 0m);
 
         var staffId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -302,4 +309,4 @@ public class SessionConfirmationsController : ControllerBase
             Status = progress.Status.ToString()
         };
     }
-}
+}

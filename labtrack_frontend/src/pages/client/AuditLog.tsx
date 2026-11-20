@@ -11,10 +11,22 @@ const PAGE_SIZE = 50;
 const ACTIONS: { value: string; label: string }[] = [
   { value: "SessionFacultyConfirmed", label: "Faculty confirmed a session" },
   { value: "SessionFinalConfirmed", label: "Final confirmation (hours credited)" },
+  { value: "AttendanceManuallyRecorded", label: "Attendance recorded manually" },
+  { value: "WorkstationStaffUnlocked", label: "Staff unlocked a PC" },
   { value: "UserLoggedIn", label: "Login" },
   { value: "PasswordChanged", label: "Password changed" },
   { value: "UserCreated", label: "Account created" },
-  { value: "WorkstationStaffUnlocked", label: "Staff unlocked a PC" },
+  { value: "SessionStatusMarked", label: "Class status marked" },
+  { value: "ReportTemplateUploaded", label: "Report template uploaded" },
+  { value: "ReportTemplateReset", label: "Report template reset" },
+  { value: "AcademicYearCreated", label: "Semester added" },
+  { value: "AcademicYearUpdated", label: "Semester edited" },
+  { value: "AcademicYearActivated", label: "Semester made active" },
+  { value: "AcademicYearDeleted", label: "Semester deleted" },
+  { value: "MakeUpClassCreated", label: "Make-up class added" },
+  { value: "MakeUpClassDeleted", label: "Make-up class removed" },
+  { value: "RemindersAutoSendOn", label: "Automatic emails turned on" },
+  { value: "RemindersAutoSendOff", label: "Automatic emails turned off" },
 ];
 const labelFor = (action: string) => ACTIONS.find((a) => a.value === action)?.label ?? action;
 

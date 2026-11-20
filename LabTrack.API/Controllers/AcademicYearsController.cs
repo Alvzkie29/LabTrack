@@ -1,19 +1,31 @@
-﻿using LabTrack.Api.Data;
+﻿using System.Globalization;
+using System.Security.Claims;
+using System.Text.RegularExpressions;
+using LabTrack.Api.Data;
 using LabTrack.Api.Models;
+using LabTrack.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace LabTrack.Api.Controllers;
 
-public class CreateAcademicYearDto
+public class SaveAcademicYearDto
 {
+    /// <summary>The school year, e.g. "2026-2027".</summary>
     public string Label { get; set; } = string.Empty;
-    public TermType TermType { get; set; }
-    public DateTime StartDate { get; set; }
-    public DateTime EndDate { get; set; }
+    /// <summary>"FirstSemester", "SecondSemester" or "Summer".</summary>
+    public string TermType { get; set; } = string.Empty;
+    public DateOnly StartDate { get; set; }
+    public DateOnly EndDate { get; set; }
+    /// <summary>The first day of the 2nd term. Not used for Summer.</summary>
+    public DateOnly? SecondTermStart { get; set; }
 }
 
+/// <summary>
+/// The semesters. Each semester has its own classes, sessions and reports, so a new school year
+/// starts clean. Only one semester is active at a time; the pages open on it.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
@@ -22,115 +34,157 @@ public class AcademicYearsController : ControllerBase
     private readonly ApplicationDbContext _db;
     public AcademicYearsController(ApplicationDbContext db) => _db = db;
 
+    /// <summary>The semesters, newest first.</summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll() => Ok(await _db.AcademicYears.ToListAsync());
-
-    [HttpGet("active")]
-    public async Task<IActionResult> GetActive()
+    public async Task<IActionResult> GetAll()
     {
-        var active = await _db.AcademicYears.FirstOrDefaultAsync(a => a.IsActive);
-        return active is null ? NotFound("No active academic year is set.") : Ok(active);
+        var years = await _db.AcademicYears
+            .OrderByDescending(a => a.StartDate)
+            .Select(a => new
+            {
+                a.AyId,
+                a.Label,
+                a.TermType,
+                a.StartDate,
+                a.EndDate,
+                a.SecondTermStart,
+                a.IsActive,
+                Classes = a.CourseSections.Count()
+            })
+            .ToListAsync();
+
+        // The enum is named here, after the query: inside it, SQL turns it into "0", "1", "2".
+        return Ok(years.Select(a => new
+        {
+            a.AyId,
+            a.Label,
+            TermType = a.TermType.ToString(),
+            a.StartDate,
+            a.EndDate,
+            a.SecondTermStart,
+            a.IsActive,
+            a.Classes
+        }));
     }
 
     [HttpPost]
-    [Authorize(Roles = "Administrator")]
-    public async Task<IActionResult> Create(CreateAcademicYearDto dto)
+    [Authorize(Roles = "Custodian,Administrator")]
+    public async Task<IActionResult> Create([FromBody] SaveAcademicYearDto dto)
     {
+        var (problem, term) = Validate(dto);
+        if (problem is not null) return BadRequest(new { message = problem });
+        var label = dto.Label.Trim();
+        if (await _db.AcademicYears.AnyAsync(a => a.Label == label && a.TermType == term))
+            return Conflict(new { message = $"{Describe(term)} {label} already exists." });
+
         var ay = new AcademicYear
         {
-            Label = dto.Label,
-            TermType = dto.TermType,
-            StartDate = dto.StartDate,
-            EndDate = dto.EndDate
+            Label = label,
+            TermType = term,
+            StartDate = dto.StartDate.ToDateTime(TimeOnly.MinValue),
+            EndDate = dto.EndDate.ToDateTime(TimeOnly.MinValue),
+            SecondTermStart = term == TermType.Summer ? null : dto.SecondTermStart?.ToDateTime(TimeOnly.MinValue),
+            // The very first semester becomes active by itself.
+            IsActive = !await _db.AcademicYears.AnyAsync(),
         };
-
         _db.AcademicYears.Add(ay);
         await _db.SaveChangesAsync();
-        return Ok(new { ay.AyId, ay.Label, ay.TermType, ay.StartDate, ay.EndDate, ay.IsActive });
+        await Audit("AcademicYearCreated", ay, $"{Describe(term)} {label}, {dto.StartDate:yyyy-MM-dd} to {dto.EndDate:yyyy-MM-dd}");
+        return Ok(new { ay.AyId });
     }
 
-    /// <summary>Marks this academic year active and deactivates all others (only one active term at a time).</summary>
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "Custodian,Administrator")]
+    public async Task<IActionResult> Update(int id, [FromBody] SaveAcademicYearDto dto)
+    {
+        var ay = await _db.AcademicYears.FindAsync(id);
+        if (ay is null) return NotFound(new { message = "Semester not found." });
+        var (problem, term) = Validate(dto);
+        if (problem is not null) return BadRequest(new { message = problem });
+        var label = dto.Label.Trim();
+        if (await _db.AcademicYears.AnyAsync(a => a.AyId != id && a.Label == label && a.TermType == term))
+            return Conflict(new { message = $"{Describe(term)} {label} already exists." });
+
+        ay.Label = label;
+        ay.TermType = term;
+        ay.StartDate = dto.StartDate.ToDateTime(TimeOnly.MinValue);
+        ay.EndDate = dto.EndDate.ToDateTime(TimeOnly.MinValue);
+        ay.SecondTermStart = term == TermType.Summer ? null : dto.SecondTermStart?.ToDateTime(TimeOnly.MinValue);
+        await _db.SaveChangesAsync();
+        await Audit("AcademicYearUpdated", ay,
+            $"{Describe(term)} {label}, {dto.StartDate:yyyy-MM-dd} to {dto.EndDate:yyyy-MM-dd}, 2nd term {dto.SecondTermStart:yyyy-MM-dd}");
+        return NoContent();
+    }
+
+    /// <summary>Makes this the active semester; the one before it stops being active.</summary>
     [HttpPost("{id:int}/activate")]
-    [Authorize(Roles = "Administrator")]
+    [Authorize(Roles = "Custodian,Administrator")]
     public async Task<IActionResult> Activate(int id)
     {
-        var target = await _db.AcademicYears.FindAsync(id);
-        if (target is null) return NotFound();
-
-        var currentlyActive = await _db.AcademicYears.Where(a => a.IsActive).ToListAsync();
-        foreach (var ay in currentlyActive) ay.IsActive = false;
-
-        target.IsActive = true;
+        var all = await _db.AcademicYears.ToListAsync();
+        var ay = all.FirstOrDefault(a => a.AyId == id);
+        if (ay is null) return NotFound(new { message = "Semester not found." });
+        foreach (var a in all) a.IsActive = a.AyId == id;
         await _db.SaveChangesAsync();
-
-        return Ok(new { target.AyId, target.Label, target.IsActive });
+        await Audit("AcademicYearActivated", ay, $"{Describe(ay.TermType)} {ay.Label}");
+        return NoContent();
     }
-    /// <summary>
-    /// One row per class day with at least one login: how many rostered students were present,
-    /// the class list size, the active PCs in the lab(s) the class met in that day, and whether
-    /// that day's session has been finally confirmed (with the hours credited).
-    /// </summary>
-    [HttpGet("by-section/{sectionId:int}/history")]
-    [Authorize(Roles = "LabAssistant,Custodian,Administrator")]
-    public async Task<IActionResult> GetHistory(int sectionId)
+
+    /// <summary>Only a semester with no classes can be deleted, so no records are lost.</summary>
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Custodian,Administrator")]
+    public async Task<IActionResult> Delete(int id)
     {
-        // Philippine time is UTC+8; login times are stored in UTC.
-        const int utcOffsetHours = 8;
+        var ay = await _db.AcademicYears.FindAsync(id);
+        if (ay is null) return NotFound(new { message = "Semester not found." });
+        if (await _db.CourseSections.AnyAsync(c => c.AyId == id))
+            return Conflict(new { message = "This semester has classes, so it can't be deleted." });
+        if (ay.IsActive) return Conflict(new { message = "Make another semester active before deleting this one." });
+        _db.AcademicYears.Remove(ay);
+        await _db.SaveChangesAsync();
+        await Audit("AcademicYearDeleted", ay, $"{Describe(ay.TermType)} {ay.Label}");
+        return NoContent();
+    }
 
-        var rosterIds = (await _db.SectionEnrollments
-            .Where(e => e.SectionId == sectionId)
-            .Select(e => e.StudentId)
-            .ToListAsync()).ToHashSet();
+    private static string Describe(TermType t) => t switch
+    {
+        TermType.FirstSemester => "1st Semester",
+        TermType.SecondSemester => "2nd Semester",
+        _ => "Summer",
+    };
 
-        var logins = await _db.AttendanceSessions
-            .Where(a => a.SectionId == sectionId)
-            .Select(a => new { a.StudentId, a.LoginTime })
-            .ToListAsync();
+    private static (string? Problem, TermType Term) Validate(SaveAcademicYearDto dto)
+    {
+        if (!Enum.TryParse<TermType>(dto.TermType, out var term) || !Enum.IsDefined(term))
+            return ("Pick 1st Semester, 2nd Semester or Summer.", default);
 
-        var meetings = await _db.SectionSchedules
-            .Where(m => m.SectionId == sectionId)
-            .Select(m => new { m.DayOfWeek, m.LabId })
-            .ToListAsync();
+        var m = Regex.Match(dto.Label?.Trim() ?? "", @"^(\d{4})-(\d{4})$");
+        if (!m.Success || int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture) != int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) + 1)
+            return ("Write the school year like 2026-2027.", term);
 
-        var activePcsByLab = await _db.Workstations
-            .Where(w => w.IsActive)
-            .GroupBy(w => w.LabId)
-            .Select(g => new { LabId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.LabId, x => x.Count);
+        if (dto.EndDate <= dto.StartDate) return ("The end date must be after the start date.", term);
+        if (dto.EndDate.DayNumber - dto.StartDate.DayNumber > 200) return ("A semester can't be longer than about 6 months. Check the dates.", term);
 
-        var confirmations = await _db.SessionConfirmations
-            .Where(sc => sc.SectionId == sectionId && sc.FinalConfirmedAt != null)
-            .Select(sc => new { sc.SessionDate, sc.HoursCredited })
-            .ToListAsync();
+        if (term != TermType.Summer)
+        {
+            if (dto.SecondTermStart is null) return ("Enter the day the 2nd term starts.", term);
+            if (dto.SecondTermStart <= dto.StartDate || dto.SecondTermStart > dto.EndDate)
+                return ("The 2nd term must start between the semester's start and end dates.", term);
+        }
+        return (null, term);
+    }
 
-        var days = logins
-            .GroupBy(l => DateOnly.FromDateTime(l.LoginTime.AddHours(utcOffsetHours)))
-            .OrderByDescending(g => g.Key)
-            .Select(g =>
-            {
-                var weekday = g.Key.DayOfWeek.ToString();
-                var pcs = meetings
-                    .Where(m => m.DayOfWeek == weekday)
-                    .Select(m => m.LabId)
-                    .Distinct()
-                    .Sum(labId => activePcsByLab.GetValueOrDefault(labId));
-
-                var confirmed = confirmations
-                    .Where(c => DateOnly.FromDateTime(c.SessionDate) == g.Key)
-                    .ToList();
-
-                return new
-                {
-                    Date = g.Key,
-                    PresentCount = g.Select(x => x.StudentId).Distinct().Count(x => rosterIds.Contains(x)),
-                    RosterCount = rosterIds.Count,
-                    Workstations = pcs,
-                    Confirmed = confirmed.Count > 0,
-                    HoursCredited = confirmed.Count > 0 ? (decimal?)confirmed.Sum(c => c.HoursCredited) : null
-                };
-            })
-            .ToList();
-
-        return Ok(days);
+    private async Task Audit(string action, AcademicYear ay, string details)
+    {
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value,
+            Action = action,
+            EntityType = nameof(AcademicYear),
+            EntityId = ay.AyId.ToString(CultureInfo.InvariantCulture),
+            Details = details,
+            IpAddress = this.CallerIp(),
+        });
+        await _db.SaveChangesAsync();
     }
 }

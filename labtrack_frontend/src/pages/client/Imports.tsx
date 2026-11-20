@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Upload, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
-import { getAcademicYears, type AcademicYear } from "@/api/academicYears";
+import { getAcademicYears, semesterName, type AcademicYear } from "@/api/academicYears";
 import { getCourseSections, type CourseSectionSummary } from "@/api/courseSections";
 import { importSchedule, importRoster } from "@/api/imports";
 import { ApiError } from "@/api/client";
@@ -17,14 +17,12 @@ export function ImportsPage() {
   const canRoster = canSchedule || role === "LabAssistant";
 
   const [years, setYears] = useState<AcademicYear[]>([]);
-  const [sections, setSections] = useState<CourseSectionSummary[]>([]);
-
-  const loadSections = () => getCourseSections().then(setSections).catch(() => setSections([]));
+  const [reload, setReload] = useState(0); // bumped after a schedule import, so the class list picks up new classes
 
   useEffect(() => {
     getAcademicYears().then(setYears).catch(() => setYears([]));
-    loadSections();
   }, []);
+  const loadSections = () => setReload((n) => n + 1);
 
   if (!canRoster) {
     return (
@@ -47,7 +45,7 @@ export function ImportsPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {canSchedule && <ScheduleCard years={years} onDone={loadSections} />}
-        <RosterCard sections={sections} />
+        <RosterCard years={years} reload={reload} />
       </div>
     </div>
   );
@@ -85,14 +83,14 @@ function ScheduleCard({ years, onDone }: { years: AcademicYear[]; onDone: () => 
   };
 
   return (
-    <Card title="Lab schedule" hint="CSV with: ClassCode, SubjectCode, Description, Units, Term, Day, StartTime, EndTime, Lab. One row per lab meeting.">
-      <Field label="Academic year">
+    <Card title="Lab schedule" hint="CSV with: ClassCode, SubjectCode, Description, Units, Term, Day, StartTime, EndTime, Lab, LectureRoom. One row per lab meeting. Term is 1st Term, 2nd Term or Sem: a term class only shows in its own term.">
+      <Field label="Semester">
         <select value={ayId} onChange={(e) => setAyId(e.target.value ? Number(e.target.value) : "")}
           className="w-full rounded-md px-3 py-2 text-[13px] outline-none" style={{ border: `1px solid ${BORDER}` }}>
           {years.length === 0 && <option value="">No academic year found</option>}
           {years.map((y) => (
             <option key={y.ayId} value={y.ayId}>
-              {y.label} ({y.startDate.slice(0, 10)} to {y.endDate.slice(0, 10)}){y.isActive ? " · active" : ""}
+              {semesterName(y)} ({y.startDate.slice(0, 10)} to {y.endDate.slice(0, 10)}){y.isActive ? " · active" : ""}
             </option>
           ))}
         </select>
@@ -104,7 +102,19 @@ function ScheduleCard({ years, onDone }: { years: AcademicYear[]; onDone: () => 
   );
 }
 
-function RosterCard({ sections }: { sections: CourseSectionSummary[] }) {
+function RosterCard({ years, reload }: { years: AcademicYear[]; reload: number }) {
+  // The class list goes to a class of the chosen semester (the active one at first), so the next
+  // semester's class lists can be loaded before it is made active.
+  const [ayId, setAyId] = useState<number | "">("");
+  const [sections, setSections] = useState<CourseSectionSummary[]>([]);
+  useEffect(() => {
+    if (ayId === "" && years.length > 0) setAyId((years.find((y) => y.isActive) ?? years[0]).ayId);
+  }, [years, ayId]);
+  useEffect(() => {
+    if (ayId === "") return;
+    getCourseSections({ ayId: Number(ayId) }).then(setSections).catch(() => setSections([]));
+  }, [ayId, reload]);
+
   const [sectionId, setSectionId] = useState<number | "">("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -132,6 +142,14 @@ function RosterCard({ sections }: { sections: CourseSectionSummary[] }) {
 
   return (
     <Card title="Class list" hint="CSV from the registrar with the student ID and name. New students get an account with a temporary password they must change at first login.">
+      <Field label="Semester">
+        <select value={ayId} onChange={(e) => { setAyId(e.target.value ? Number(e.target.value) : ""); setSectionId(""); }}
+          className="w-full rounded-md px-3 py-2 text-[13px] outline-none" style={{ border: `1px solid ${BORDER}` }}>
+          {years.map((y) => (
+            <option key={y.ayId} value={y.ayId}>{semesterName(y)}{y.isActive ? " · active" : ""}</option>
+          ))}
+        </select>
+      </Field>
       <Field label="Class">
         <select value={sectionId} onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : "")}
           className="w-full rounded-md px-3 py-2 text-[13px] outline-none" style={{ border: `1px solid ${BORDER}` }}>

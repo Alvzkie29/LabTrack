@@ -20,6 +20,8 @@ export interface CourseSectionSummary {
   sectionCode: string;
   subject: { subjectId: number; code: string; title: string };
   academicYear: string;
+  termPart: 1 | 2 | null;   // the term a term class runs in; null for the whole semester
+  term: string;             // "1st Term", "2nd Term" or "Whole semester"
   facultyId: string | null;
   faculty: string | null;
   hasInstructorAssigned: boolean;
@@ -40,7 +42,13 @@ export interface CourseSectionDetail {
   sectionId: number;
   sectionCode: string;
   subject: { subjectId: number; code: string; title: string; requiredHours: number; termWeeks: number };
-  academicYear: { label: string; startDate: string; endDate: string };
+  academicYear: { label: string; startDate: string; endDate: string; secondTermStart: string | null };
+  termPart: 1 | 2 | null;
+  term: string;
+  makeUps: {
+    makeUpId: number; date: string; startTime: string; endTime: string;
+    labId: number; laboratory: string; roomCode: string; reason: string | null;
+  }[];
   facultyId: string | null;
   faculty: string | null;
   hasInstructorAssigned: boolean;

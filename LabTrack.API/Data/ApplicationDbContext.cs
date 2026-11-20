@@ -20,7 +20,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SectionEnrollment> SectionEnrollments => Set<SectionEnrollment>();
     public DbSet<SectionSchedule> SectionSchedules => Set<SectionSchedule>();
-
+    public DbSet<SessionStatus> SessionStatuses => Set<SessionStatus>();
+    public DbSet<MakeUpClass> MakeUpClasses => Set<MakeUpClass>();
+    public DbSet<ReminderLog> ReminderLogs => Set<ReminderLog>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -213,5 +216,27 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         // The lookup the agent runs at every login: the meetings in this lab on this day.
         builder.Entity<SectionSchedule>()
             .HasIndex(s => new { s.LabId, s.DayOfWeek });
+
+        // ---- Make-up classes ----
+        // Removed with their class; a laboratory or user with make-ups on record can't be deleted.
+        builder.Entity<MakeUpClass>().HasKey(m => m.MakeUpId);
+
+        builder.Entity<MakeUpClass>()
+            .HasOne(m => m.CourseSection)
+            .WithMany(c => c.MakeUpClasses)
+            .HasForeignKey(m => m.SectionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<MakeUpClass>()
+            .HasOne(m => m.Laboratory)
+            .WithMany()
+            .HasForeignKey(m => m.LabId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<MakeUpClass>()
+            .HasOne(m => m.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(m => m.CreatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Printer, FileSpreadsheet } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
-import { getAcademicYears, type AcademicYear } from "@/api/academicYears";
+import { getAcademicYears, semesterName, type AcademicYear } from "@/api/academicYears";
 import { getCourseSections, getSectionUtilization, type CourseSectionSummary, type SectionUtilization } from "@/api/courseSections";
 import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
 import { downloadCsv } from "@/utils/csv";
@@ -19,6 +19,8 @@ export function ComplianceReportPage() {
 
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [ayId, setAyId] = useState<number | "">("");
+  // Which classes: all, the 1st- or 2nd-term classes, or the classes that run the whole semester.
+  const [termFilter, setTermFilter] = useState<"all" | "1" | "2" | "sem">("all");
   const [sections, setSections] = useState<CourseSectionSummary[]>([]);
   const [labs, setLabs] = useState<LaboratorySummary[]>([]);
   const [utilization, setUtilization] = useState<Record<number, SectionUtilization>>({});
@@ -48,8 +50,10 @@ export function ComplianceReportPage() {
   const labRoom = labs.find((l) => l.labId === labId)?.roomCode ?? "";
 
   const rows = useMemo(
-    () => [...sections].sort((a, b) => a.subject.code.localeCompare(b.subject.code) || a.sectionCode.localeCompare(b.sectionCode)),
-    [sections],
+    () => [...sections]
+      .filter((s) => termFilter === "all" || (termFilter === "sem" ? s.termPart === null : String(s.termPart) === termFilter))
+      .sort((a, b) => a.subject.code.localeCompare(b.subject.code) || a.sectionCode.localeCompare(b.sectionCode)),
+    [sections, termFilter],
   );
 
   const totals = useMemo(() => {
@@ -113,9 +117,16 @@ export function ComplianceReportPage() {
             <option value="">All laboratories</option>
             {labs.map((l) => <option key={l.labId} value={l.labId}>{l.roomCode}</option>)}
           </select>
+          <select value={termFilter} onChange={(e) => setTermFilter(e.target.value as typeof termFilter)}
+            className="rounded-md px-3 py-1.5 text-[12.5px] outline-none" style={{ border: `1px solid ${BORDER}` }}>
+            <option value="all">All classes</option>
+            <option value="1">1st term classes</option>
+            <option value="2">2nd term classes</option>
+            <option value="sem">Whole-semester classes</option>
+          </select>
           <select value={ayId} onChange={(e) => setAyId(e.target.value ? Number(e.target.value) : "")}
             className="rounded-md px-3 py-1.5 text-[12.5px] outline-none" style={{ border: `1px solid ${BORDER}` }}>
-            {years.map((y) => <option key={y.ayId} value={y.ayId}>{y.label}{y.isActive ? " (active)" : ""}</option>)}
+            {years.map((y) => <option key={y.ayId} value={y.ayId}>{semesterName(y)}{y.isActive ? " (active)" : ""}</option>)}
           </select>
           <button onClick={exportCsv} disabled={rows.length === 0}
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium"

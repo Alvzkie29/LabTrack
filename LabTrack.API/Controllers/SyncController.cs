@@ -2,6 +2,7 @@
 using System.Text;
 using LabTrack.Api.Data;
 using LabTrack.Api.Models;
+using LabTrack.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -73,8 +74,22 @@ public class SyncController : ControllerBase
             })
             .ToListAsync();
 
-        var sections = await _db.CourseSections
+        // The classes meeting in this lab in the current term, and today's make-up classes here
+        // (added as a meeting on today's weekday; the snapshot expires within a day).
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(UtcOffsetHours));
+        var classes = await _db.CourseSections
+            .Include(c => c.Subject)
+            .Include(c => c.AcademicYear)
+            .Include(c => c.Schedules)
             .Where(c => c.AcademicYear.IsActive && c.Schedules.Any(m => m.LabId == labId))
+            .ToListAsync();
+        var makeUps = await _db.MakeUpClasses
+            .Include(m => m.CourseSection).ThenInclude(c => c.Subject)
+            .Where(m => m.LabId == labId && m.Date == today && m.CourseSection.AcademicYear.IsActive)
+            .ToListAsync();
+
+        var sections = classes
+            .Where(c => c.RunsOn(today))
             .Select(c => new
             {
                 c.SectionId,
@@ -84,9 +99,22 @@ public class SyncController : ControllerBase
                 Meetings = c.Schedules
                     .Where(m => m.LabId == labId)
                     .Select(m => new { m.DayOfWeek, m.StartTime, m.EndTime })
+                    .Concat(makeUps.Where(m => m.SectionId == c.SectionId)
+                        .Select(m => new { DayOfWeek = today.DayOfWeek.ToString(), m.StartTime, m.EndTime }))
                     .ToList()
             })
-            .ToListAsync();
+            .Concat(makeUps
+                .Where(m => !classes.Any(c => c.SectionId == m.SectionId && c.RunsOn(today)))
+                .GroupBy(m => m.SectionId)
+                .Select(g => new
+                {
+                    SectionId = g.Key,
+                    g.First().CourseSection.SectionCode,
+                    SubjectCode = g.First().CourseSection.Subject.Code,
+                    SubjectTitle = g.First().CourseSection.Subject.Title,
+                    Meetings = g.Select(m => new { DayOfWeek = today.DayOfWeek.ToString(), m.StartTime, m.EndTime }).ToList()
+                }))
+            .ToList();
 
         var workstations = await _db.Workstations
             .Where(w => w.LabId == labId && w.IsActive)
@@ -161,4 +189,4 @@ public class SyncController : ControllerBase
 
         return Ok(results);
     }
-}
+}

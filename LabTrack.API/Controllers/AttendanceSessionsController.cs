@@ -3,8 +3,18 @@ using LabTrack.Api.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
+using LabTrack.Api.Models;
+using LabTrack.Api.Services;
 namespace LabTrack.Api.Controllers;
+
+public class ManualAttendanceDto
+{
+    public int SectionId { get; set; }
+    public string StudentId { get; set; } = string.Empty;
+    public DateOnly Date { get; set; }
+    public int WorkstationId { get; set; }
+    public string Note { get; set; } = string.Empty;
+}
 
 [ApiController]
 [Route("api/[controller]")]
@@ -24,9 +34,12 @@ public class AttendanceSessionsController : ControllerBase
         [FromQuery] int? sectionId,
         [FromQuery] int? labId,
         [FromQuery] DateTime? from,
-        [FromQuery] DateTime? to)
+        [FromQuery] DateTime? to,
+        [FromQuery] int? ayId)
     {
-        var query = _db.AttendanceSessions.AsQueryable();
+        // The semester's classes only (the active semester by default).
+        var semester = await ayId.OrActiveAsync(_db);
+        var query = _db.AttendanceSessions.Where(a => a.CourseSection.AyId == semester);
 
         if (sectionId.HasValue) query = query.Where(a => a.SectionId == sectionId.Value);
         if (labId.HasValue) query = query.Where(a => a.Workstation.LabId == labId.Value);
@@ -75,6 +88,11 @@ public class AttendanceSessionsController : ControllerBase
             .OrderBy(m => m.StartTime)
             .Select(m => new { m.StartTime, m.EndTime, Lab = m.Laboratory.RoomCode })
             .ToListAsync();
+        // A make-up class that day counts as a meeting too.
+        meetings.AddRange(await _db.MakeUpClasses
+            .Where(m => m.SectionId == sectionId && m.Date == day)
+            .Select(m => new { m.StartTime, m.EndTime, Lab = m.Laboratory.RoomCode })
+            .ToListAsync());
 
         var logins = await _db.AttendanceSessions
             .Where(a => a.SectionId == sectionId && a.LoginTime >= dayStartUtc && a.LoginTime < dayEndUtc)
@@ -251,4 +269,92 @@ public class AttendanceSessionsController : ControllerBase
             })
         });
     }
-}
+    /// <summary>
+    /// Staff record a student as present by hand, for a session the PC Agent could not record
+    /// (server and Master PC both unreachable). The student must be on the class list, the
+    /// note is required, and the entry is labelled as manual and written to the audit log.
+    /// Not allowed once the session has its final confirmation.
+    /// </summary>
+    [HttpPost("manual")]
+    [Authorize(Roles = "LabAssistant,Custodian,Administrator")]
+    public async Task<IActionResult> RecordManual(ManualAttendanceDto dto)
+    {
+        const int utcOffsetHours = 8; // Philippine time
+
+        var staffId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (staffId is null) return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(dto.Note) || dto.Note.Trim().Length < 5)
+            return BadRequest("Please give a reason for the manual entry.");
+
+        var enrolled = await _db.SectionEnrollments
+            .AnyAsync(e => e.SectionId == dto.SectionId && e.StudentId == dto.StudentId);
+        if (!enrolled) return BadRequest("That student is not on this class's list.");
+
+        // The class must meet that day (a lab meeting in its term, or a make-up class), and the PC
+        // must be in the lab it meets in.
+        var weekday = dto.Date.DayOfWeek.ToString();
+        var section = await _db.CourseSections.Include(c => c.AcademicYear).FirstOrDefaultAsync(c => c.SectionId == dto.SectionId);
+        if (section is null) return NotFound();
+        var meetings = await _db.SectionSchedules
+            .Where(m => m.SectionId == dto.SectionId && m.DayOfWeek == weekday)
+            .OrderBy(m => m.StartTime)
+            .Select(m => new { m.LabId, m.StartTime })
+            .ToListAsync();
+        if (!section.RunsOn(dto.Date)) meetings.Clear(); // outside the class's term
+        meetings.AddRange(await _db.MakeUpClasses
+            .Where(m => m.SectionId == dto.SectionId && m.Date == dto.Date)
+            .Select(m => new { m.LabId, m.StartTime })
+            .ToListAsync());
+        if (meetings.Count == 0) return BadRequest("This class has no lab meeting or make-up class on that date.");
+
+        var workstation = await _db.Workstations.FirstOrDefaultAsync(w => w.WorkstationId == dto.WorkstationId);
+        if (workstation is null || !meetings.Any(m => m.LabId == workstation.LabId))
+            return BadRequest("That PC is not in the laboratory this class meets in on that day.");
+
+        var sessionDate = dto.Date.ToDateTime(TimeOnly.MinValue);
+        var finalised = await _db.SessionConfirmations.AnyAsync(sc =>
+            sc.SectionId == dto.SectionId
+            && sc.SessionDate == sessionDate
+            && sc.SessionType == SessionType.Physical
+            && sc.FinalConfirmedAt != null);
+        if (finalised) return BadRequest("This session already has its final confirmation.");
+
+        // One attendance record per student per class per day.
+        var dayStartUtc = sessionDate.AddHours(-utcOffsetHours);
+        var exists = await _db.AttendanceSessions.AnyAsync(a =>
+            a.StudentId == dto.StudentId
+            && a.SectionId == dto.SectionId
+            && a.LoginTime >= dayStartUtc
+            && a.LoginTime < dayStartUtc.AddDays(1));
+        if (exists) return BadRequest("This student already has an attendance record for that day.");
+
+        // There was no real login, so the record carries the start time of the class meeting.
+        var meeting = meetings.First(m => m.LabId == workstation.LabId);
+        var loginUtc = dto.Date.ToDateTime(meeting.StartTime).AddHours(-utcOffsetHours);
+
+        var attendance = new AttendanceSession
+        {
+            StudentId = dto.StudentId,
+            WorkstationId = workstation.WorkstationId,
+            SectionId = dto.SectionId,
+            LoginTime = loginUtc,
+            Notes = $"Manual entry: {dto.Note.Trim()}"
+        };
+        _db.AttendanceSessions.Add(attendance);
+        await _db.SaveChangesAsync(); // generates AttendanceId
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            UserId = staffId,
+            Action = "AttendanceManuallyRecorded",
+            EntityType = nameof(AttendanceSession),
+            EntityId = attendance.AttendanceId.ToString(),
+            Details = $"SectionId={dto.SectionId}, SessionDate={dto.Date:yyyy-MM-dd}, Pc={workstation.PcIdentifier}, Note={dto.Note.Trim()}",
+            IpAddress = this.CallerIp(),
+        });
+        await _db.SaveChangesAsync();
+
+        return Ok(new { attendance.AttendanceId });
+    }
+}

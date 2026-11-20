@@ -2,8 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { CheckCircle2, AlertTriangle, Users } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { getCourseSections, getCourseSection, type CourseSectionSummary, type CourseSectionDetail } from "@/api/courseSections";
-import { getSectionAttendance, type SectionAttendance } from "@/api/attendance";
-import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
+import { getSectionAttendance, recordManualAttendance, type SectionAttendance, type AbsentRow } from "@/api/attendance";
+import { getLaboratories, getLabWorkstations, type LaboratorySummary, type WorkstationEntry } from "@/api/laboratories";
 import {
   getFacultyOptions, getConfirmationsBySection, facultyConfirm, finalConfirm, createVirtualSession,
   type FacultyOption, type ConfirmationRow,
@@ -47,6 +47,9 @@ export function ConfirmSessionsPage() {
   const [pin, setPin] = useState("");
   const [notes, setNotes] = useState("");
   const [virtualHours, setVirtualHours] = useState("2");
+
+  // Manual attendance: the PCs of the lab this class meets in on the chosen date.
+  const [labPcs, setLabPcs] = useState<WorkstationEntry[]>([]);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +104,20 @@ export function ConfirmSessionsPage() {
       setFacultyId(opts[0]?.id ?? "");
     });
   }, [sectionId, sessionDate, refresh]);
+
+  useEffect(() => {
+    setLabPcs([]);
+    if (!detail) return;
+    const weekday = new Date(sessionDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
+    const labIds = [...new Set([
+      ...detail.meetings.filter((m) => m.dayOfWeek === weekday).map((m) => m.laboratory.labId),
+      ...(detail.makeUps ?? []).filter((m) => m.date.slice(0, 10) === sessionDate).map((m) => m.labId), // a make-up class that day
+    ])];
+    if (labIds.length === 0) return;
+    Promise.all(labIds.map((id) => getLabWorkstations(id)))
+      .then((lists) => setLabPcs(lists.flat().filter((w) => w.isActive)))
+      .catch(() => setLabPcs([]));
+  }, [detail, sessionDate]);
 
   if (!allowed) return <Restricted />;
 
@@ -334,7 +351,13 @@ export function ConfirmSessionsPage() {
                   {detail.meetings
                     .map((m) => `${m.dayOfWeek.slice(0, 3)} ${timeLabel(m.startTime)}–${timeLabel(m.endTime)} · ${m.laboratory.roomCode}`)
                     .join("  |  ")}
+                  {detail.termPart && ` · ${detail.term} only`}
                 </div>
+                {(detail.makeUps ?? []).filter((m) => m.date.slice(0, 10) === sessionDate).map((m) => (
+                  <div key={m.makeUpId} className="mt-1 text-[12px] font-semibold" style={{ color: MAROON }}>
+                    Make-up class this day: {timeLabel(m.startTime)}–{timeLabel(m.endTime)} · {m.roomCode}
+                  </div>
+                ))}
                 {detail.compliance && (
                   <div className="mt-2">
                     <div style={{ height: 6, background: "#e1e4e8", borderRadius: 999 }}>
@@ -363,8 +386,16 @@ export function ConfirmSessionsPage() {
                   <div className="mt-2 space-y-3">
                     <NameList title="Present" tone="#1a7f37"
                       rows={attendance.present.map((r) => ({ key: r.attendanceId, left: r.name, right: `${r.workstation} · ${new Date(r.loginTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` }))} />
-                    <NameList title="Absent" tone="#b42318"
-                      rows={attendance.absent.map((r) => ({ key: r.studentId, left: r.name, right: r.schoolId }))} />
+                    <AbsentList
+                      rows={attendance.absent}
+                      pcs={labPcs}
+                      onMarkPresent={(studentId, workstationId, note) =>
+                        run(async () => {
+                          await recordManualAttendance({ sectionId: Number(sectionId), studentId, date: sessionDate, workstationId, note });
+                          return "Marked present. The entry is labelled as recorded manually.";
+                        })
+                      }
+                    />
                     <NameList title="Logged in, not on roster" tone="#9a6700"
                       rows={attendance.notOnRoster.map((r) => ({ key: r.attendanceId, left: r.name, right: r.workstation }))} />
                   </div>
@@ -373,6 +404,214 @@ export function ConfirmSessionsPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {attendance && attendance.absent.length > 1 && (
+        <BulkManual
+          key={`${sectionId}-${sessionDate}`}
+          rows={attendance.absent}
+          pcs={labPcs}
+          busy={busy}
+          onSubmit={(entries, note) =>
+            run(async () => {
+              let saved = 0;
+              const failed: string[] = [];
+              // One request per student, in order, so one bad row does not stop the rest.
+              for (const e of entries) {
+                try {
+                  await recordManualAttendance({
+                    sectionId: Number(sectionId), studentId: e.studentId, date: sessionDate,
+                    workstationId: e.workstationId, note,
+                  });
+                  saved++;
+                } catch (err) {
+                  failed.push(`${e.name}: ${err instanceof ApiError ? err.message : "failed"}`);
+                }
+              }
+              if (saved === 0) throw new ApiError(400, failed.join(" | "));
+              return `${saved} student${saved === 1 ? "" : "s"} marked present.` +
+                (failed.length ? ` Not saved: ${failed.join(" | ")}` : "");
+            })
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * For an outage, when the whole class was recorded on paper: tick the students who were
+ * present, pick each one's PC, give one reason, and save them together.
+ */
+function BulkManual({ rows, pcs, busy, onSubmit }: {
+  rows: AbsentRow[];
+  pcs: WorkstationEntry[];
+  busy: boolean;
+  onSubmit: (entries: { studentId: string; name: string; workstationId: number }[], note: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<Record<string, number | "">>({}); // studentId -> PC ("" = ticked, no PC yet)
+  const [note, setNote] = useState("");
+
+  const ticked = Object.keys(picked);
+  const ready = ticked.filter((id) => picked[id] !== "");
+  const usedPcs = new Set(Object.values(picked).filter((v) => v !== ""));
+  const canSave = ready.length > 0 && ready.length === ticked.length && note.trim().length >= 5 && !busy;
+
+  const toggle = (id: string) =>
+    setPicked((p) => {
+      const next = { ...p };
+      if (id in next) delete next[id];
+      else next[id] = "";
+      return next;
+    });
+
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-left">
+        <span>
+          <span className="text-[13px] font-semibold">Record attendance from a paper sheet</span>
+          <span className="ml-2 text-[12px]" style={{ color: MUTED }}>
+            For a session when the server and Master PC were down
+          </span>
+        </span>
+        <span className="font-mono text-[11px]" style={{ color: MAROON }}>{open ? "Hide" : "Open"}</span>
+      </button>
+
+      {open && (
+        <div className="space-y-3 px-4 pb-4" style={{ borderTop: "1px solid #e1e4e8" }}>
+          {pcs.length === 0 ? (
+            <div className="pt-3 text-[12.5px]" style={{ color: MUTED }}>
+              This class has no laboratory meeting on this day of the week, so there is no PC to record.
+            </div>
+          ) : (
+            <>
+              <div className="max-h-80 overflow-auto pt-2">
+                <table className="w-full text-[12.5px]">
+                  <tbody>
+                    {rows.map((r) => {
+                      const on = r.studentId in picked;
+                      return (
+                        <tr key={r.studentId} style={{ borderBottom: "1px solid #f0f2f4" }}>
+                          <td className="w-8 py-1.5">
+                            <input type="checkbox" checked={on} onChange={() => toggle(r.studentId)} aria-label={`Present: ${r.name}`} />
+                          </td>
+                          <td className="py-1.5 pr-3">{r.name}</td>
+                          <td className="py-1.5 pr-3 font-mono text-[11.5px]" style={{ color: MUTED }}>{r.schoolId}</td>
+                          <td className="w-56 py-1.5">
+                            {on && (
+                              <select
+                                value={picked[r.studentId]}
+                                onChange={(e) => setPicked((p) => ({ ...p, [r.studentId]: e.target.value ? Number(e.target.value) : "" }))}
+                                className="w-full rounded px-2 py-1 text-[12px] outline-none"
+                                style={{ border: `1px solid ${picked[r.studentId] === "" ? MAROON : BORDER}`, background: "#fff" }}
+                              >
+                                <option value="">PC used...</option>
+                                {pcs.map((w) => (
+                                  <option key={w.workstationId} value={w.workstationId}
+                                    disabled={usedPcs.has(w.workstationId) && picked[r.studentId] !== w.workstationId}>
+                                    {w.seatLabel} ({w.pcIdentifier})
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <input value={note} onChange={(e) => setNote(e.target.value)}
+                placeholder="Reason for all of these, e.g. Server and Master PC were down; from the paper sheet"
+                className="w-full rounded-md px-3 py-2 text-[12.5px] outline-none" style={{ border: `1px solid ${BORDER}` }} />
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[12px]" style={{ color: MUTED }}>
+                  {ticked.length} ticked{ticked.length !== ready.length ? ` · ${ticked.length - ready.length} still need a PC` : ""}
+                </span>
+                <button type="button" disabled={!canSave}
+                  onClick={() => {
+                    onSubmit(ready.map((id) => ({
+                      studentId: id,
+                      name: rows.find((r) => r.studentId === id)?.name ?? id,
+                      workstationId: Number(picked[id]),
+                    })), note.trim());
+                    setPicked({});
+                  }}
+                  className="rounded-md px-4 py-2 text-[12.5px] font-semibold"
+                  style={{ background: MAROON, color: GOLD, opacity: canSave ? 1 : 0.6 }}>
+                  {busy ? "Saving..." : `Record ${ready.length || ""} as present`}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Absent students, each with a "Mark present" action for sessions the PC Agent could not record. */
+function AbsentList({ rows, pcs, onMarkPresent }: {
+  rows: AbsentRow[];
+  pcs: WorkstationEntry[];
+  onMarkPresent: (studentId: string, workstationId: number, note: string) => void;
+}) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [pcId, setPcId] = useState<number | "">("");
+  const [note, setNote] = useState("");
+
+  if (rows.length === 0) return null;
+
+  const open = (studentId: string) => { setOpenId(studentId); setPcId(""); setNote(""); };
+
+  return (
+    <div>
+      <div className="text-[11.5px] font-semibold" style={{ color: "#b42318" }}>Absent ({rows.length})</div>
+      <div className="mt-1 max-h-56 space-y-1 overflow-auto pr-1">
+        {rows.map((r) => (
+          <div key={r.studentId}>
+            <div className="flex items-center justify-between text-[12px]">
+              <span>{r.name}</span>
+              <span className="flex items-center gap-2">
+                <span className="font-mono" style={{ color: MUTED }}>{r.schoolId}</span>
+                <button type="button" onClick={() => (openId === r.studentId ? setOpenId(null) : open(r.studentId))}
+                  className="rounded px-1.5 py-0.5 text-[11px]" style={{ border: `1px solid ${BORDER}`, color: MAROON }}>
+                  {openId === r.studentId ? "Cancel" : "Mark present"}
+                </button>
+              </span>
+            </div>
+            {openId === r.studentId && (
+              <div className="mt-1.5 space-y-1.5 rounded-md p-2" style={{ background: "#f6f8fa", border: `1px solid ${BORDER}` }}>
+                {pcs.length === 0 ? (
+                  <div className="text-[11.5px]" style={{ color: MUTED }}>
+                    This class has no laboratory meeting on this day of the week, so there is no PC to record.
+                  </div>
+                ) : (
+                  <>
+                    <select value={pcId} onChange={(e) => setPcId(e.target.value ? Number(e.target.value) : "")}
+                      className="w-full rounded px-2 py-1 text-[12px] outline-none" style={{ border: `1px solid ${BORDER}`, background: "#fff" }}>
+                      <option value="">PC the student used...</option>
+                      {pcs.map((w) => <option key={w.workstationId} value={w.workstationId}>{w.seatLabel} ({w.pcIdentifier})</option>)}
+                    </select>
+                    <input value={note} onChange={(e) => setNote(e.target.value)}
+                      placeholder="Reason, e.g. Server and Master PC were down; from the paper sheet"
+                      className="w-full rounded px-2 py-1 text-[12px] outline-none" style={{ border: `1px solid ${BORDER}` }} />
+                    <button type="button" disabled={!pcId || note.trim().length < 5}
+                      onClick={() => { onMarkPresent(r.studentId, Number(pcId), note.trim()); setOpenId(null); }}
+                      className="w-full rounded px-2 py-1 text-[12px] font-semibold"
+                      style={{ background: MAROON, color: GOLD, opacity: !pcId || note.trim().length < 5 ? 0.6 : 1 }}>
+                      Record as present
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -383,7 +622,7 @@ function NameList({ title, tone, rows }: { title: string; tone: string; rows: { 
   return (
     <div>
       <div className="text-[11.5px] font-semibold" style={{ color: tone }}>{title} ({rows.length})</div>
-      <div className="mt-1 space-y-1">
+      <div className="mt-1 max-h-56 space-y-1 overflow-auto pr-1">
         {rows.map((r) => (
           <div key={r.key} className="flex items-center justify-between text-[12px]">
             <span>{r.left}</span>

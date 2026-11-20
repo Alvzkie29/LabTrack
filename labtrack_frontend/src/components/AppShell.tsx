@@ -14,16 +14,21 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Briefcase,
-  CheckCircle2,  
+  CheckCircle2,
+  CalendarCheck,
   ShieldAlert,   
   FileSpreadsheet,
   Monitor,
   Upload,
+  CalendarRange,
+  CalendarClock,
+  Mail,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useRole, type Role, canAccess } from "@/contexts/RoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getQuickAlerts, type QuickAlert } from "@/api/alerts";
+import { getAcademicYears, semesterName, type AcademicYear } from "@/api/academicYears";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +54,12 @@ const ALL_NAV: NavItem[] = [
   { to: "/attendance-report", label: "Attendance Reports", icon: <FileSpreadsheet className={IC} strokeWidth={1.75} /> },
   { to: "/audit-log",         label: "Audit Log",          icon: <ShieldAlert className={IC} strokeWidth={1.75} /> },
   { to: "/compliance-report", label: "Compliance Report", icon: <FileSpreadsheet className={IC} strokeWidth={1.75} /> },
+  { to: "/class-status",      label: "Class Status",       icon: <CalendarCheck className={IC} strokeWidth={1.75} /> },
+  { to: "/weekly-report",     label: "Weekly Report",      icon: <FileSpreadsheet className={IC} strokeWidth={1.75} /> },
   { to: "/schedule",  label: "Schedule",  icon: <CalendarDays className={IC} strokeWidth={1.75} /> },
+  { to: "/make-up-classes", label: "Make-up Classes", icon: <CalendarClock className={IC} strokeWidth={1.75} /> },
+  { to: "/email-reminders", label: "Email Reminders", icon: <Mail className={IC} strokeWidth={1.75} /> },
+  { to: "/academic-years", label: "Academic Years", icon: <CalendarRange className={IC} strokeWidth={1.75} /> },
   { to: "/users",     label: "Users",     icon: <Users className={IC} strokeWidth={1.75} /> },
 ];
 
@@ -81,8 +91,13 @@ function labelForPath(pathname: string): string {
   if (pathname.startsWith("/compliance-report")) return "Compliance Report";
   if (pathname.startsWith("/at-risk")) return "At Risk";
   if (pathname.startsWith("/attendance-report")) return "Attendance Reports";
+  if (pathname.startsWith("/class-status")) return "Class Status";
+  if (pathname.startsWith("/weekly-report")) return "Weekly Report";
   if (pathname.startsWith("/schedule")) return "Schedule";
   if (pathname.startsWith("/audit-log")) return "Audit Log";
+  if (pathname.startsWith("/academic-years")) return "Academic Years";
+  if (pathname.startsWith("/make-up-classes")) return "Make-up Classes";
+  if (pathname.startsWith("/email-reminders")) return "Email Reminders";
   if (pathname.startsWith("/users")) return "Users";
   if (pathname.startsWith("/settings")) return "Settings";
   return "Page";
@@ -213,7 +228,7 @@ function Sidebar({
 }
 
 export function AppShell() {
-  const { role, assignedLabs } = useRole();
+  const { role } = useRole();
   const { user: authUser, logout } = useAuth();
   const navigate = useNavigate();
   const pathname = useLocation().pathname;
@@ -227,6 +242,15 @@ export function AppShell() {
     email: authUser?.schoolId ?? "",
   };
   const pageLabel = labelForPath(pathname);
+
+  // The active semester, shown in the header: every page follows it.
+  const [activeSemester, setActiveSemester] = useState<AcademicYear | null | undefined>(undefined);
+  useEffect(() => {
+    getAcademicYears().then((ys) => setActiveSemester(ys.find((y) => y.isActive) ?? null)).catch(() => setActiveSemester(undefined));
+  }, [pathname]); // checked again on each page, so a change on Academic Years shows at once
+  const today = new Date().toLocaleDateString("en-CA"); // yyyy-mm-dd, local
+  const termNow = !activeSemester || activeSemester.termType === "Summer" ? null
+    : activeSemester.secondTermStart && today >= activeSemester.secondTermStart.slice(0, 10) ? "2nd Term" : "1st Term";
 
   const [alerts, setAlerts] = useState<QuickAlert[]>([]);
   useEffect(() => {
@@ -315,29 +339,22 @@ export function AppShell() {
           </div>
 
           <div className="ml-auto flex items-center gap-2.5">
-            {/* Assigned lab badges (Lab Assistant only) */}
-            {role === "LabAssistant" && assignedLabs.length > 0 && (
-              <div className="hidden sm:flex items-center gap-1.5">
-                <span className="font-mono text-[10.5px] uppercase tracking-wider" style={{ color: "#57606a" }}>
-                  Assigned Lab{assignedLabs.length > 1 ? "s" : ""}:
-                </span>
-                {assignedLabs.map((lab) => (
-                  <span
-                    key={lab}
-                    className="font-mono text-[11px]"
-                    style={{
-                      background: "#fff4f4",
-                      border: "1px solid #f1d7d7",
-                      color: MAROON,
-                      padding: "2px 8px",
-                      borderRadius: 999,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {lab}
-                  </span>
-                ))}
-              </div>
+            {/* Active semester: the classes every page shows */}
+            {activeSemester !== undefined && (
+              <span
+                className="hidden md:inline-flex items-center gap-1.5 font-mono text-[11px]"
+                title="Pages show this semester's classes. Change it on the Academic Years page."
+                style={{
+                  background: activeSemester ? "#fff4f4" : "#fff8e6",
+                  border: `1px solid ${activeSemester ? "#f1d7d7" : "#f0d58c"}`,
+                  color: activeSemester ? MAROON : "#7a5900",
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  fontWeight: 600,
+                }}
+              >
+                {activeSemester ? `${semesterName(activeSemester)}${termNow ? ` · ${termNow}` : ""}` : "No active semester"}
+              </span>
             )}
 
             {/* Role badge (read-only chip; no switching from header) */}
