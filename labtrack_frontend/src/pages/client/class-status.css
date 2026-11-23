@@ -291,8 +291,8 @@
   background: #f9f5f0;
   border-bottom: 1px solid #e8ddd4;
   font-family: var(--font-mono);
-  font-size: 9px;
-  color: #ac929f;
+  font-size: 12px;
+  color: #4b3e46;
 }
 .cs-day-heading {
   position: sticky;
@@ -308,13 +308,14 @@
   border-left: 1px solid #eee6de;
 }
 .cs-day-heading > span {
-  font-size: 11px;
-  color: #9a8290;
+  font-size: 14px;
+  color: #4b3e46;
+  font-weight: 600;
 }
 .cs-day-heading > strong {
   font-size: 21px;
   font-weight: 500;
-  color: #79566b;
+  color: #4b3e46;
 }
 .cs-day-heading.is-today {
   background: #fbf0e8;
@@ -341,8 +342,8 @@
   right: 0;
   padding-right: 7px;
   text-align: right;
-  font-size: 9px;
-  color: #a38b98;
+  font-size: 12px;
+  color: #4b3e46;
   white-space: nowrap;
   line-height: 1.5;
   z-index: 1;
@@ -387,7 +388,7 @@
   border-left-width: 3px;
   border-radius: 8px;
   background: #f4f0eb;
-  color: #86737d;
+  color: #40343a;
   cursor: pointer;
   box-shadow: 0 2px 4px #39252b03;
   transition:
@@ -415,29 +416,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: inherit;
 }
 .cs-meeting-title > small {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 12px;
   color: inherit;
-  opacity: 0.8;
+  opacity: 1;
   flex-shrink: 0;
 }
 .cs-meeting-time {
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1.5;
   color: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
 }
 .cs-meeting-faculty {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.6;
-  opacity: 0.8;
+  opacity: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -451,46 +453,46 @@
   min-width: 0;
 }
 .cs-meeting-status > small {
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.5;
   color: inherit;
 }
 .cs-meeting-onsite {
   background: #f0f6ec;
   border-color: #cdddc1;
-  color: #637e54;
+  color: #315326;
 }
 .cs-meeting-pending {
   background: #fff7e3;
   border-color: #e6d4a4;
-  color: #9b7839;
+  color: #725018;
 }
 .cs-meeting-virtual {
   background: #f4eff7;
   border-color: #d9cce2;
-  color: #876b93;
+  color: #604071;
 }
 .cs-meeting-marked {
   background: #faf0ec;
   border-color: #e4c8bd;
-  color: #9a6461;
+  color: #7a3733;
 }
 .cs-meeting-needs-status {
   background: #fcf7ed;
   border-color: #e5d7b9;
-  color: #9d804a;
+  color: #71511f;
 }
 .cs-meeting-unmarked {
   background: #f6f2ee;
   border-color: #ded6cf;
-  color: #96828b;
+  color: #493c43;
 }
 .cs-status {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   max-width: 100%;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.5;
   color: inherit;
   min-width: 0;
@@ -505,45 +507,45 @@
   white-space: nowrap;
 }
 .cs-status-onsite {
-  color: #647d54;
+  color: #315326;
 }
 .cs-status-pending {
-  color: #a17b35;
+  color: #725018;
 }
 .cs-status-virtual {
-  color: #876d93;
+  color: #604071;
 }
 .cs-status-marked {
-  color: #9d6660;
+  color: #7a3733;
 }
 .cs-status-needs-status {
-  color: #a17d3e;
+  color: #71511f;
 }
 .cs-status-unmarked {
-  color: #9f8994;
+  color: #493c43;
 }
 .cs-meeting.is-compact {
   padding: 5px 7px;
   gap: 1px;
 }
 .cs-meeting.is-compact .cs-meeting-title > strong {
-  font-size: 10px;
+  font-size: 15px;
 }
 .cs-meeting.is-compact .cs-meeting-title > small {
-  font-size: 8px;
+  font-size: 12px;
 }
 .cs-meeting.is-compact .cs-meeting-time {
-  font-size: 9px;
+  font-size: 12px;
 }
 .cs-meeting.is-compact .cs-status {
-  font-size: 8px;
+  font-size: 12px;
 }
 .cs-meeting.is-compact .cs-status > svg {
   width: 10px;
   height: 10px;
 }
 .cs-meeting.is-compact .cs-meeting-status > small {
-  font-size: 8px;
+  font-size: 12px;
 }
 .cs-calendar-footer {
   display: flex;
@@ -553,9 +555,9 @@
   flex-wrap: wrap;
   border-top: 1px solid #e9dfd5;
   padding: 12px 20px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.7;
-  color: #a68c9d;
+  color: #4b3e46;
 }
 .cs-status-legend {
   display: flex;
@@ -566,8 +568,8 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #9a8491;
-  font-size: 10px;
+  color: #4b3e46;
+  font-size: 12px;
 }
 .cs-status-legend > span::before {
   content: "";
@@ -625,7 +627,7 @@
   cursor: pointer;
 }
 .cs-day-navigation > button > span {
-  font-size: 10px;
+  font-size: 12px;
 }
 .cs-day-navigation > button > strong {
   font-size: 16px;
@@ -660,8 +662,8 @@
   align-items: start;
 }
 .cs-agenda-time {
-  font-size: 11px;
-  color: #a38a99;
+  font-size: 12px;
+  color: #4b3e46;
   line-height: 1.7;
   padding-top: 10px;
 }
@@ -672,17 +674,17 @@
   padding: 13px 15px;
 }
 .cs-agenda-entry .cs-meeting-title > strong {
-  font-size: 14px;
+  font-size: 15px;
 }
 .cs-agenda-entry .cs-meeting-title > small {
-  font-size: 11px;
+  font-size: 12px;
 }
 .cs-agenda-entry .cs-meeting-time,
 .cs-agenda-entry .cs-meeting-faculty {
-  font-size: 11px;
+  font-size: 12px;
 }
 .cs-agenda-entry .cs-status {
-  font-size: 10px;
+  font-size: 12px;
 }
 .cs-day-empty {
   display: flex;
@@ -982,12 +984,12 @@
 .cs-status-editor h4 {
   font-size: 15px;
   font-weight: 500;
-  color: #7a596d;
+  color: #4b3e46;
 }
 .cs-status-editor > p {
   font-size: 12px;
   line-height: 1.9;
-  color: #a08696;
+  color: #4b3e46;
   margin: 9px 0 15px;
 }
 .cs-status-editor [role="combobox"] {
@@ -999,17 +1001,17 @@
 .cs-status-editor > small {
   display: block;
   margin-top: 12px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.8;
-  color: #b096a5;
+  color: #4b3e46;
 }
 .cs-status-editor > p.cs-upcoming-note {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
-  color: #a18b98;
+  color: #4b3e46;
   padding: 10px 12px;
   background: #f2ece6;
   border-radius: 8px;
@@ -1305,7 +1307,7 @@
     border-radius: 9px;
   }
   .cs-day-navigation > button > span {
-    font-size: 9px;
+    font-size: 12px;
   }
   .cs-day-navigation > button > strong {
     font-size: 16px;
@@ -1323,7 +1325,7 @@
     gap: 10px;
   }
   .cs-agenda-time {
-    font-size: 9px;
+    font-size: 12px;
     line-height: 1.7;
     padding-top: 12px;
   }
@@ -1333,31 +1335,31 @@
     min-height: 117px;
   }
   .cs-agenda-entry .cs-meeting-title > strong {
-    font-size: 12px;
+    font-size: 15px;
   }
   .cs-agenda-entry .cs-meeting-title > small {
-    font-size: 9px;
+    font-size: 12px;
   }
   .cs-agenda-entry .cs-meeting-time,
   .cs-agenda-entry .cs-meeting-faculty {
-    font-size: 10px;
+    font-size: 12px;
   }
   .cs-agenda-entry .cs-status {
-    font-size: 9px;
+    font-size: 12px;
   }
   .cs-agenda-entry .cs-meeting-status > small {
-    font-size: 9px;
+    font-size: 12px;
   }
   .cs-calendar-footer {
     padding: 12px 15px;
-    font-size: 9px;
+    font-size: 12px;
     gap: 9px;
   }
   .cs-status-legend {
     gap: 8px 12px;
   }
   .cs-status-legend > span {
-    font-size: 9px;
+    font-size: 12px;
   }
   .cs-notice {
     margin: 0 15px 13px;

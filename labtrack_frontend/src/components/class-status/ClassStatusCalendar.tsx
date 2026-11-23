@@ -21,7 +21,7 @@ export function ClassStatusCalendar({ week, meetings, selectedId, onSelect, day,
   const unknown = meetings.filter(m => m.start === null || m.end === null);
   const selectedDay = week.days.includes(day) ? day : week.days[0];
   const dayMeetings = meetings.filter(m => m.cell.date === selectedDay).sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity) || a.row.sectionCode.localeCompare(b.row.sectionCode));
-  const template = `64px ${week.days.map(date => `minmax(${Math.max(185, Math.max(1, ...(placed.get(date) ?? []).map(e => e.lanes)) * 125)}px,1fr)`).join(" ")}`;
+  const template = `88px ${week.days.map(date => `minmax(${Math.max(185, Math.max(1, ...(placed.get(date) ?? []).map(e => e.lanes)) * 150)}px,1fr)`).join(" ")}`;
   return <div className={`cs-calendar-content ${view === "day" ? "is-day-view" : ""}`}>
     <div className="cs-day-agenda">
       <nav className="cs-day-navigation" aria-label="Choose calendar day">{week.days.map(date =>
