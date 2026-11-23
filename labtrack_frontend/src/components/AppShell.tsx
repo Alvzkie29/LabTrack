@@ -1,3 +1,4 @@
+import { OnlineStaff } from "@/components/OnlineStaff";
 import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutGrid,
@@ -21,6 +22,7 @@ import {
   CalendarClock,
   Mail,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -231,7 +233,8 @@ export function AppShell() {
     name: authUser?.fullName ?? "—",
     sub: ROLE_DISPLAY_LABELS[role],
     initials: authUser ? initialsFor(authUser.fullName) : "?",
-    email: authUser?.schoolId ?? "",
+    email: authUser?.email ?? "",
+    schoolId: authUser?.schoolId ?? "",
   };
 
   useEffect(() => {
@@ -346,6 +349,7 @@ export function AppShell() {
           </form>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 pl-1 sm:gap-3 sm:pl-3">
+            <OnlineStaff />
             <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className="relative flex size-10 items-center justify-center rounded-xl border border-white/80 bg-white/55 text-[#70776a] transition hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#800000]"
@@ -378,14 +382,30 @@ export function AppShell() {
                     <span className="block max-w-[130px] truncate text-[12px] font-semibold text-[#33392e]">{user.name}</span>
                     <span className="mt-0.5 block max-w-[130px] truncate text-[10px] text-[#8a9080]">{user.sub}</span>
                   </span>
-                  <Settings className="ml-2 hidden size-3.5 text-[#89917f] md:block" strokeWidth={1.6} />
+                  <ChevronDown aria-hidden="true" className="ml-1 hidden size-3.5 text-[#89917f] sm:block" strokeWidth={1.6} />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 rounded-2xl border-[#e0e4d9] p-2 shadow-xl">
-                <DropdownMenuLabel className="font-normal">
-                  <span className="block text-sm font-semibold">{user.name}</span>
-                  <span className="mt-1 block text-xs text-[#828878]">{user.email} · {role}</span>
+              <DropdownMenuContent align="end" className="w-[min(320px,calc(100vw-24px))] rounded-2xl border-[#e0e4d9] p-2 shadow-xl">
+                <DropdownMenuLabel className="px-3 py-3 font-normal">
+                  <span className="mb-3 block text-[10px] font-semibold uppercase tracking-wider text-[#828878]">Signed in as</span>
+                  <span className="flex items-center gap-3">
+                    <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#800000] text-sm font-bold text-[#F4C430]">{user.initials}</span>
+                    <span className="min-w-0">
+                      <span className="block break-words text-sm font-semibold text-[#33392e]">{user.name}</span>
+                      <span className="mt-1 block text-xs text-[#828878]">{ROLE_DISPLAY_LABELS[authUser?.role ?? role]}</span>
+                    </span>
+                  </span>
                 </DropdownMenuLabel>
+                <dl className="space-y-2 px-3 pb-3 text-xs">
+                  <div>
+                    <dt className="text-[#828878]">Email</dt>
+                    <dd className="mt-0.5 break-words text-[#33392e]">{user.email || "Not provided"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[#828878]">School ID</dt>
+                    <dd className="mt-0.5 break-words text-[#33392e]">{user.schoolId || "Not provided"}</dd>
+                  </div>
+                </dl>
                 {activeSemester !== undefined && <p className="px-2 pb-2 text-[11px] leading-relaxed text-[#800000]">{activeSemester ? `${semesterName(activeSemester)}${termNow ? ` · ${termNow}` : ""}` : "No active semester"}</p>}
                 <DropdownMenuSeparator />
                 {canAccess(role, "/settings") && <DropdownMenuItem className="rounded-xl py-2" onClick={() => navigate("/settings")}><Settings className="mr-2 size-3.5" />Account settings</DropdownMenuItem>}
