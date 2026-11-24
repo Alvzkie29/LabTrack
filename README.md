@@ -1,4 +1,4 @@
-# LabTrack
+# LabTrack 2026
 
 LabTrack manages university computer laboratory usage, attendance, schedules, and compliance reporting. This workspace contains a staff web application, its API, and a Windows workstation agent.
 
