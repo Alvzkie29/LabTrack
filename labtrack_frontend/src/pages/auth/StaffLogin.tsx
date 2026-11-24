@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
 
 const MAROON = "#800000";
 const GOLD = "#F4C430";
@@ -31,7 +32,6 @@ export function StaffLoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -39,7 +39,6 @@ export function StaffLoginPage() {
 
     if (isSubmitting) return;
 
-    setError(null);
     setIsSubmitting(true);
 
     try {
@@ -50,7 +49,7 @@ export function StaffLoginPage() {
 
       if (user.role === "Student" || user.role === "Faculty") {
         logout();
-        setError(
+        snackbar.error(
           "This portal is for authorized staff only. Students sign in through the laboratory PC Agent, while Faculty confirm sessions using their PIN."
         );
         return;
@@ -58,7 +57,7 @@ export function StaffLoginPage() {
 
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError(
+      snackbar.error(
         err instanceof ApiError
           ? err.message
           : "Something went wrong. Please try again."
@@ -136,21 +135,7 @@ export function StaffLoginPage() {
           <div className="flex items-center justify-between gap-3">
 
             {/* Mobile branding */}
-            <div className="flex items-center gap-2.5 md:hidden">
-              <div
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-extrabold"
-                style={{
-                  background: MAROON,
-                  color: GOLD,
-                }}
-              >
-                LT
-              </div>
-
-              <span className="text-[16px] font-bold tracking-tight">
-                LabTrack
-              </span>
-            </div>
+         
           </div>
 
           {/* Form container */}
@@ -187,7 +172,6 @@ export function StaffLoginPage() {
                     value={identifier}
                     onChange={(e) => {
                       setIdentifier(e.target.value);
-                      setError(null);
                     }}
                     placeholder=" "
                     autoComplete="username"
@@ -221,7 +205,6 @@ export function StaffLoginPage() {
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
-                      setError(null);
                     }}
                     placeholder=" "
                     autoComplete="current-password"
@@ -257,14 +240,6 @@ export function StaffLoginPage() {
               </div>
 
               {/* Login error */}
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-xl border border-[#ebc9c6] bg-[#fff3f1] px-4 py-3 text-[12px] leading-relaxed text-[#a32d28]"
-                >
-                  {error}
-                </div>
-              )}
 
               {/* Sign in button */}
               <Button

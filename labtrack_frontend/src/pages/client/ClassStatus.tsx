@@ -10,6 +10,7 @@ import { getMakeUpClasses } from "@/api/makeUpClasses";
 import { getStatusWeek, markStatus, type StatusWeek } from "@/api/sessionStatus";
 import { termWeeks } from "@/utils/termWeeks";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ClassStatusCalendar } from "@/components/class-status/ClassStatusCalendar";
 import { MeetingInspector } from "@/components/class-status/MeetingInspector";
@@ -24,8 +25,7 @@ export function ClassStatusPage() {
   const [weekStart, setWeekStart] = useState(""); const [view, setView] = useState<"week" | "day">("week"); const [day, setDay] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null); const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null);
   const [busy, setBusy] = useState<"manual" | "suggestions" | null>(null); const lock = useRef(false);
-  const [messageTone, setMessageTone] = useState<"success" | "warning">("success");
-  const [error, setError] = useState<string | null>(null); const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const labsQuery = useQuery({ queryKey: [...prefix, "laboratories"], queryFn: getLaboratories, enabled: allowed, staleTime: 60_000, retry: false });
   const yearsQuery = useQuery({ queryKey: [...prefix, "academic-periods"], queryFn: getAcademicYears, enabled: allowed, staleTime: 60_000, retry: false });
   const labs = labsQuery.data ?? []; const years = yearsQuery.data ?? [];
@@ -42,38 +42,36 @@ export function ClassStatusPage() {
   const week = ready ? weekQuery.data ?? null : null;
   const meetings = useMemo(() => calendarMeetings(week, schedulesQuery.isError ? undefined : schedulesQuery.data, makeUpsQuery.isError ? undefined : makeUpsQuery.data), [week, schedulesQuery.data, schedulesQuery.isError, makeUpsQuery.data, makeUpsQuery.isError]);
   const selectedMeeting = selectedId ? meetings.find(m => m.id === selectedId) ?? null : null;
-  useEffect(() => { setSelectedId(null); setError(null); setMessage(null); }, [labId, ayId, weekStart]);
+  useEffect(() => { setSelectedId(null); setError(null); }, [labId, ayId, weekStart]);
   useEffect(() => { if (week) setDay(current => week.days.includes(current) ? current : week.days.includes(today) ? today : week.days[0] ?? ""); }, [week?.weekStart, today]);
   const suggestionsLeft = week ? week.rows.reduce((n, row) => n + row.cells.filter(c => c.meets && !c.status && c.suggestion && c.source !== "confirmation").length, 0) : 0;
   const pastMeetings = week?.rows.reduce((n, row) => n + row.cells.filter(c => c.meets && c.date < today).length, 0) ?? 0;
   const pendingFinal = week?.rows.reduce((n, row) => n + row.cells.filter(c => c.meets && c.source === "confirmation" && c.awaitingFinal).length, 0) ?? 0;
-  function openMeeting(meeting: CalendarMeeting, element: HTMLElement) { setSelectedId(meeting.id); setReturnFocus(element); setError(null); setMessage(null); }
+  function openMeeting(meeting: CalendarMeeting, element: HTMLElement) { setSelectedId(meeting.id); setReturnFocus(element); setError(null); }
 
   async function save(meeting: CalendarMeeting, status: string, note?: string) {
     if (lock.current || !week || meeting.cell.source === "confirmation") return false;
-    lock.current = true; setBusy("manual"); setError(null); setMessage(null);
+    lock.current = true; setBusy("manual"); setError(null);
     try {
       const result = await markStatus({ sectionId: meeting.row.sectionId, sessionDate: meeting.cell.date, status, note });
       // Update only the existing section/date record; all same-day meeting cards share it.
       client.setQueryData<StatusWeek>(weekKey, current => current ? { ...current, rows: current.rows.map(row => row.sectionId !== meeting.row.sectionId ? row : { ...row, cells: row.cells.map(cell => cell.date !== meeting.cell.date ? cell : { ...cell, status: result.status, note: result.note ?? null, source: result.status ? "marked" : null }) }) } : current);
       const refreshed = await weekQuery.refetch();
-      setMessageTone("success");
-      setMessage(status ? "Class status saved. The existing Weekly Report uses this record." : "Manual status cleared.");
+      snackbar.success(status ? "Class status saved. The existing Weekly Report uses this record." : "Manual status cleared.");
       if (refreshed.isError) setError("The status was saved, but the week could not be refreshed. Reload to verify the latest weekly completion count.");
       return true;
-    } catch (e) { setError(failure(e, "Could not save that status.")); return false; }
+    } catch (e) { snackbar.error(failure(e, "Could not save that status.")); return false; }
     finally { lock.current = false; setBusy(null); }
   }
   async function fillSuggestions() {
     if (!week || lock.current) return;
     const todo = week.rows.flatMap(row => row.cells.filter(cell => cell.meets && !cell.status && cell.suggestion && cell.source !== "confirmation").map(cell => ({ row, cell })));
     if (!todo.length) return;
-    lock.current = true; setBusy("suggestions"); setError(null); setMessage(null); let saved = 0;
+    lock.current = true; setBusy("suggestions"); setError(null); let saved = 0;
     try {
       for (const { row, cell } of todo) { try { await markStatus({ sectionId: row.sectionId, sessionDate: cell.date, status: cell.suggestion! }); saved++; } catch {/* Preserve independent attempts; the refreshed backend count shows what remains. */ } }
       const refreshed = await weekQuery.refetch();
-      setMessageTone(saved === todo.length ? "success" : "warning");
-      setMessage(`${saved} of ${todo.length} suggestion${todo.length === 1 ? "" : "s"} saved. Change any that are wrong, for example to Fieldwork or On Leave.`);
+      snackbar[saved === todo.length ? "success" : "warning"](`${saved} of ${todo.length} suggestion${todo.length === 1 ? "" : "s"} saved. Change any that are wrong, for example to Fieldwork or On Leave.`);
       if (refreshed.isError) setError("Suggestion attempts finished, but the week could not be refreshed. Reload to verify the saved records.");
     } finally { lock.current = false; setBusy(null); }
   }
@@ -137,7 +135,7 @@ export function ClassStatusPage() {
       {weekQuery.isError && ready && <div className="cs-notice is-error" role="alert">
         <AlertTriangle size={15} />
         <span>{failure(weekQuery.error, "Could not load the week.")}</span>
-        <button disabled={!!busy} onClick={() => void weekQuery.refetch()}>Reload week</button>
+        <button disabled={!!busy} onClick={() => void weekQuery.refetch().then((result) => { if (!result.isError) setError(null); })}>Reload week</button>
       </div>}
       {(schedulesQuery.isError || makeUpsQuery.isError) && ready && <div className="cs-notice is-warning" role="alert">
         <Info size={15} />
@@ -147,9 +145,7 @@ export function ClassStatusPage() {
       {error && <div className="cs-notice is-error" role="alert">
         <AlertTriangle size={15} />
         <span>{error}</span>
-      </div>}{message && <div className={`cs-notice is-${messageTone}`} role="status">
-        <CheckCircle2 size={15} />
-        <span>{message}</span>
+        <button disabled={!!busy} onClick={() => void weekQuery.refetch().then((result) => { if (!result.isError) setError(null); })}>Reload week</button>
       </div>}
       {loading ? <div className="cs-calendar-loading" role="status">
         <div className="cs-calendar-skeleton">{Array.from({ length: 5 }, (_, i) =>
@@ -188,6 +184,6 @@ export function ClassStatusPage() {
         <span>On-site and Virtual come from session confirmations.</span>
       </footer>
     </section>
-    <MeetingInspector meeting={selectedMeeting} week={week} academicYearId={ayId} busy={!!busy} error={error} message={message} today={today} onClose={() => setSelectedId(null)} returnFocus={returnFocus} onSave={save} />
+    <MeetingInspector meeting={selectedMeeting} week={week} academicYearId={ayId} busy={!!busy} error={error} today={today} onClose={() => setSelectedId(null)} returnFocus={returnFocus} onSave={save} />
   </div>;
 }

@@ -6,6 +6,7 @@ import {
 import { useAuth, ROLE_LABELS } from "@/contexts/AuthContext";
 import { changePassword } from "@/api/auth";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
 import { ACCENTS, DEFAULT_THEME, useThemePreference, type ThemeAccent, type ThemeMode } from "@/utils/Theme";
 import "./settings.css";
 
@@ -75,7 +76,6 @@ function ChangePasswordCard() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitting = useRef(false);
 
@@ -87,14 +87,13 @@ function ChangePasswordCard() {
   const submit = async () => {
     if (submitting.current) return;
     setError(null);
-    setSuccess(false);
     if (newPassword !== confirmPassword) { setError("New passwords don't match."); return; }
     if (newPassword.length < 6) { setError("New password must be at least 6 characters."); return; }
     submitting.current = true;
     setIsSubmitting(true);
     try {
       await changePassword(currentPassword, newPassword);
-      setSuccess(true);
+      snackbar.success("Password changed successfully.");
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to change password.");
@@ -118,11 +117,11 @@ function ChangePasswordCard() {
       <form className="st-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <label className="st-field st-span-2">
           <span>Current password</span>
-          <input type={type} value={currentPassword} onChange={(e) => { setCurrentPassword(e.target.value); setSuccess(false); }} autoComplete="current-password" />
+          <input type={type} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />
         </label>
         <label className="st-field">
           <span>New password</span>
-          <input type={type} value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setSuccess(false); }} autoComplete="new-password" />
+          <input type={type} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
           {strength && (
             <span className={`st-strength level-${strength.level}`} aria-live="polite">
               <i><b /><b /><b /></i> {strength.label}
@@ -131,7 +130,7 @@ function ChangePasswordCard() {
         </label>
         <label className="st-field">
           <span>Confirm new password</span>
-          <input type={type} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setSuccess(false); }} autoComplete="new-password"
+          <input type={type} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password"
             className={confirmPassword && !matches ? "is-invalid" : ""} aria-invalid={!!confirmPassword && !matches} />
         </label>
 
@@ -141,7 +140,6 @@ function ChangePasswordCard() {
         </ul>
 
         {error && <p className="st-alert is-error st-span-2" role="alert"><AlertTriangle size={14} /> {error}</p>}
-        {success && <p className="st-alert is-ok st-span-2" role="status"><CheckCircle2 size={14} /> Password changed successfully.</p>}
 
         <div className="st-actions st-span-2">
           <button type="submit" className="st-btn is-primary" disabled={isSubmitting || !currentPassword || !newPassword}>

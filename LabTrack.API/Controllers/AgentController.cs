@@ -16,8 +16,9 @@ public class ConfirmAttendanceDto
 
 /// <summary>
 /// Endpoints used by the Lightweight PC Agent after the student logs in through api/auth/login.
-/// Step 1 (options): suggests the class meeting in this lab right now, plus the other classes
-/// meeting in the same lab today for the dropdown. Step 2 (confirm): records the attendance.
+/// Step 1 (options): suggests an enrolled class whose attendance window is open and explains
+/// why the other classes in this lab today are unavailable. Step 2 independently verifies
+/// enrollment and the scheduled attendance window before recording attendance.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -26,12 +27,15 @@ public class AgentController : ControllerBase
 {
     // Philippine time is UTC+8 all year (no daylight saving). Meeting times are local times.
     private const int LabUtcOffsetHours = 8;
-    private const int EarlyGraceMinutes = 15; // a student may log in this early before class starts
-
-    private static DateTime LabNow => DateTime.UtcNow.AddHours(LabUtcOffsetHours);
-
     private readonly ApplicationDbContext _db;
-    public AgentController(ApplicationDbContext db) => _db = db;
+    private readonly TimeProvider _clock;
+    public AgentController(ApplicationDbContext db, TimeProvider? clock = null)
+    {
+        _db = db;
+        _clock = clock ?? TimeProvider.System;
+    }
+
+    private DateTime LabNow => _clock.GetUtcNow().UtcDateTime.AddHours(LabUtcOffsetHours);
 
     /// <summary>Lets the agent check that the server is reachable. No login needed.</summary>
     [HttpGet("health")]
@@ -51,27 +55,36 @@ public class AgentController : ControllerBase
         if (workstation is null) return NotFound("This workstation is not registered in LabTrack.");
 
         var now = LabNow;
-        var time = TimeOnly.FromDateTime(now);
         var today = await GetTodaysMeetingsAsync(workstation.LabId, now);
+        var enrolledSections = (await _db.SectionEnrollments
+            .Where(e => e.StudentId == userId).Select(e => e.SectionId).ToListAsync()).ToHashSet();
+        // A section may have both a regular meeting and a make-up today. Keep its open
+        // window before collapsing to one dropdown row, so an earlier slot cannot hide it.
+        // Only the signed-in student's assigned sections are shown in the agent.
+        var choices = today.Where(m => enrolledSections.Contains(m.SectionId))
+            .GroupBy(m => m.SectionId).Select(g => PickMeeting(g, now)).ToList();
 
-        // A meeting running right now wins; otherwise the one starting within the early-login window.
-        var suggested = today
-            .Where(m => time >= m.StartTime && time <= m.EndTime)
-            .OrderByDescending(m => m.StartTime)
-            .FirstOrDefault()
-          ?? today
-            .Where(m => time >= m.StartTime.AddMinutes(-EarlyGraceMinutes) && time < m.StartTime)
-            .OrderBy(m => m.StartTime)
+        // An enrolled meeting in progress wins over a meeting in its early-login window.
+        var suggested = choices
+            .Where(m => Eligibility(m, true, now).CanConfirm)
+            .OrderBy(m => now < now.Date.Add(m.StartTime.ToTimeSpan()))
+            .ThenBy(m => now >= now.Date.Add(m.StartTime.ToTimeSpan()) ? -m.StartTime.Ticks : m.StartTime.Ticks)
+            .ThenBy(m => m.SectionId)
             .FirstOrDefault();
+        var hasAssignedToday = choices.Count > 0;
 
         return Ok(new
         {
             WorkstationId = workstation.WorkstationId,
-            Suggested = suggested is null ? null : ToOption(suggested),
-            Alternatives = today
+            ScheduleMessage = suggested is not null
+                ? "This session matches your class list and this laboratory's schedule."
+                : hasAssignedToday
+                    ? $"None of your assigned sessions is open now. You may confirm up to {AgentSessionEligibility.EarlyGraceMinutes} minutes before a session starts and before it ends."
+                    : "You have no assigned classes in this laboratory today. Please ask laboratory staff to check your class list and schedule.",
+            Suggested = suggested is null ? null : ToOption(suggested, true, now),
+            Alternatives = choices
                 .Where(m => m.SectionId != suggested?.SectionId)
-                .DistinctBy(m => m.SectionId)
-                .Select(ToOption)
+                .Select(m => ToOption(m, true, now))
         });
     }
 
@@ -88,11 +101,17 @@ public class AgentController : ControllerBase
         if (workstation is null) return NotFound("This workstation is not registered in LabTrack.");
 
         var now = LabNow;
+        var isEnrolled = await _db.SectionEnrollments.AnyAsync(e => e.StudentId == studentId && e.SectionId == dto.SectionId);
+        if (!isEnrolled)
+            return StatusCode(StatusCodes.Status403Forbidden, "Not assigned to you. You are not on this class list.");
         var today = await GetTodaysMeetingsAsync(workstation.LabId, now);
 
-        // The chosen class must have a meeting in this lab today.
-        var meeting = today.FirstOrDefault(m => m.SectionId == dto.SectionId);
+        // Never trust the dropdown: verify roster, lab, day, term and time on every POST.
+        var matches = today.Where(m => m.SectionId == dto.SectionId).ToList();
+        var meeting = matches.Count == 0 ? null : PickMeeting(matches, now);
         if (meeting is null) return BadRequest("That class is not scheduled in this laboratory today.");
+        var eligibility = Eligibility(meeting, true, now);
+        if (!eligibility.CanConfirm) return BadRequest(eligibility.Message);
 
         // One attendance record per student per class per day.
         var dayStartUtc = now.Date.AddHours(-LabUtcOffsetHours);
@@ -103,19 +122,19 @@ public class AgentController : ControllerBase
             && a.LoginTime < dayStartUtc.AddDays(1));
 
         if (existing is not null)
-            return Ok(new { existing.AttendanceId, AlreadyRecorded = true, Section = ToOption(meeting) });
+            return Ok(new { existing.AttendanceId, AlreadyRecorded = true, Section = ToOption(meeting, true, now) });
 
         var attendance = new AttendanceSession
         {
             StudentId = studentId,
             WorkstationId = workstation.WorkstationId,
             SectionId = meeting.SectionId,
-            LoginTime = DateTime.UtcNow
+            LoginTime = _clock.GetUtcNow().UtcDateTime
         };
         _db.AttendanceSessions.Add(attendance);
         await _db.SaveChangesAsync();
 
-        return Ok(new { attendance.AttendanceId, AlreadyRecorded = false, Section = ToOption(meeting) });
+        return Ok(new { attendance.AttendanceId, AlreadyRecorded = false, Section = ToOption(meeting, true, now) });
     }
 
     /// <summary>A class session in this lab today: a regular lab meeting or a make-up class.</summary>
@@ -129,16 +148,20 @@ public class AgentController : ControllerBase
     {
         var day = now.DayOfWeek.ToString(); // "Monday", same format the meetings are saved in
         var date = DateOnly.FromDateTime(now);
+        var localDate = now.Date;
 
         var meetings = await _db.SectionSchedules
             .Include(m => m.CourseSection).ThenInclude(s => s.Subject)
             .Include(m => m.CourseSection).ThenInclude(s => s.AcademicYear)
-            .Where(m => m.LabId == labId && m.DayOfWeek == day && m.CourseSection.AcademicYear.IsActive)
+            .Where(m => m.LabId == labId && m.DayOfWeek == day && m.CourseSection.AcademicYear.IsActive
+                && m.CourseSection.AcademicYear.StartDate.Date <= localDate && m.CourseSection.AcademicYear.EndDate.Date >= localDate)
             .ToListAsync();
 
         var makeUps = await _db.MakeUpClasses
             .Include(m => m.CourseSection).ThenInclude(s => s.Subject)
-            .Where(m => m.LabId == labId && m.Date == date && m.CourseSection.AcademicYear.IsActive)
+            .Include(m => m.CourseSection).ThenInclude(s => s.AcademicYear)
+            .Where(m => m.LabId == labId && m.Date == date && m.CourseSection.AcademicYear.IsActive
+                && m.CourseSection.AcademicYear.StartDate.Date <= localDate && m.CourseSection.AcademicYear.EndDate.Date >= localDate)
             .ToListAsync();
 
         return meetings
@@ -152,14 +175,30 @@ public class AgentController : ControllerBase
     private Task<bool> MustChangePasswordAsync(string userId) =>
         _db.Users.Where(u => u.Id == userId).Select(u => u.MustChangePassword).FirstOrDefaultAsync();
 
-    private static object ToOption(Slot m) => new
+    private static AgentSessionEligibility Eligibility(Slot m, bool enrolled, DateTime now) =>
+        AgentSessionEligibility.Evaluate(enrolled, now, m.StartTime, m.EndTime);
+
+    private static Slot PickMeeting(IEnumerable<Slot> meetings, DateTime now) => meetings
+        .OrderBy(m => Eligibility(m, true, now).CanConfirm ? 0 : now < now.Date.Add(m.StartTime.ToTimeSpan()) ? 1 : 2)
+        .ThenBy(m => Eligibility(m, true, now).CanConfirm && now >= now.Date.Add(m.StartTime.ToTimeSpan()) ? 0 : 1)
+        .ThenBy(m => Eligibility(m, true, now).CanConfirm && now >= now.Date.Add(m.StartTime.ToTimeSpan()) ? -m.StartTime.Ticks : m.StartTime.Ticks)
+        .First();
+
+    private static object ToOption(Slot m, bool enrolled, DateTime now)
     {
-        m.SectionId,
-        m.CourseSection.SectionCode,
-        SubjectCode = m.CourseSection.Subject.Code,
-        // The agent shows the title; a make-up class says so.
-        SubjectTitle = m.MakeUp ? $"{m.CourseSection.Subject.Title} (make-up class)" : m.CourseSection.Subject.Title,
-        m.StartTime,
-        m.EndTime
-    };
+        var eligibility = Eligibility(m, enrolled, now);
+        return new
+        {
+            m.SectionId,
+            m.CourseSection.SectionCode,
+            SubjectCode = m.CourseSection.Subject.Code,
+            SubjectTitle = m.MakeUp ? $"{m.CourseSection.Subject.Title} (make-up class)" : m.CourseSection.Subject.Title,
+            m.StartTime,
+            m.EndTime,
+            eligibility.IsEnrolled,
+            eligibility.CanConfirm,
+            EligibilityMessage = eligibility.Message,
+            EligibilityStatus = eligibility.Status
+        };
+    }
 }

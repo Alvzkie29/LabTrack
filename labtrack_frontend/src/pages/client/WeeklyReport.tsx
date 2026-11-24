@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Building2, CalendarDays, CheckCircle2, FileSpreadsheet, FileText, Loader2, Printer } from "lucide-react";
+import { AlertTriangle, Building2, CalendarDays, FileSpreadsheet, FileText, Loader2, Printer } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { downloadWeeklyWorkbook } from "@/utils/weeklyExport";
@@ -16,6 +16,7 @@ import { WeeklyReportDocument } from "@/components/weekly-report/WeeklyReportDoc
 import { WeeklyReportPreview, WeeklyReportPrintStyles } from "@/components/weekly-report/WeeklyReportPreview";
 import { WeeklyTemplateSettings } from "@/components/weekly-report/WeeklyTemplateSettings";
 import { addDays, dateCovered, fromIso, mondayOf, toIso } from "@/components/weekly-report/report-format";
+import { snackbar } from "@/utils/snackbar";
 import "./weekly-report.css";
 
 function defaultTitle(ay: AcademicYear, term: string) {
@@ -35,7 +36,6 @@ export function WeeklyReportPage() {
   const [selectedLab, setSelectedLab] = useState<number | null>(null); const [selectedPeriod, setSelectedPeriod] = useState<number | null>(null); const [weekStart, setWeekStart] = useState("");
   const [reportDate, setReportDate] = useState(manilaToday); const [title, setTitle] = useState("");
   const [exporting, setExporting] = useState(false); const exportLock = useRef(false); const [templateBusy, setTemplateBusy] = useState(false);
-  const [exportMsg, setExportMsg] = useState<{ ok: boolean; text: string } | null>(null); const [printError, setPrintError] = useState<string | null>(null);
   const client = useQueryClient(); const prefix = ["weekly-report-workspace", user?.userId, role];
   const labsQuery = useQuery({ queryKey: [...prefix, "laboratories"], queryFn: getLaboratories, enabled: allowed, staleTime: 60_000, retry: false });
   const yearsQuery = useQuery({ queryKey: [...prefix, "academic-periods"], queryFn: getAcademicYears, enabled: allowed, staleTime: 60_000, retry: false });
@@ -57,19 +57,18 @@ export function WeeklyReportPage() {
   const loading = setupLoading || enabled && reportQuery.isPending;
   const dateValid = validDate(reportDate); const locked = exporting || templateBusy;
   const previewReady = !!report && dateValid && !loading;
-  useEffect(() => { setExportMsg(null); setPrintError(null); }, [labId, ayId, weekStart]);
 
   async function downloadExcel() {
     if (!ayId || !weekStart || !selectedWeek || !dateValid || exportLock.current || templateBusy) return;
-    exportLock.current = true; setExporting(true); setExportMsg(null);
+    exportLock.current = true; setExporting(true);
     try {
       // Preserve the existing all-laboratory workbook generator and its exact options.
       const name = await downloadWeeklyWorkbook({ ayId: Number(ayId), weekStart, reportDate, title, department: REPORT_HEADER.department, preparedBy: user?.fullName ?? "", dateCovered });
-      setExportMsg({ ok: true, text: `Downloaded ${name}` });
-    } catch (e) { setExportMsg({ ok: false, text: e instanceof Error ? e.message : "Could not make the Excel file." }); }
+      snackbar.success(`Excel file prepared: ${name}`);
+    } catch (e) { snackbar.error(e instanceof Error ? e.message : "Could not make the Excel file."); }
     finally { exportLock.current = false; setExporting(false); }
   }
-  function printReport() { if (!previewReady || reportQuery.isFetching) return; setPrintError(null); try { window.print(); } catch (e) { setPrintError(e instanceof Error ? e.message : "The browser could not open the print dialog."); } }
+  function printReport() { if (!previewReady || reportQuery.isFetching) return; try { window.print(); } catch (e) { snackbar.error(e instanceof Error ? e.message : "The browser could not open the print dialog."); } }
   const refreshReport = () => { if (enabled) void reportQuery.refetch(); else void client.invalidateQueries({ queryKey: prefix }); };
   if (!allowed) return <div className="wr-restricted">
     <FileText size={28} />
@@ -126,12 +125,6 @@ export function WeeklyReportPage() {
       {selectedWeek && <div className="wr-hours-context" aria-label="Weekly hours calculation">
         <strong>Date covered: {dateCovered(weekStart, toIso(addDays(fromIso(weekStart), 5)))}</strong>
         <p>Current includes finally confirmed hours for session dates in this Monday–Saturday range. Previous contains earlier confirmed hours. The report date changes the printed date only.</p>
-      </div>}
-      {exportMsg && <div className={`wr-notice ${exportMsg.ok ? "is-success" : "is-error"}`} role={exportMsg.ok ? "status" : "alert"}>{exportMsg.ok ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}<span>{exportMsg.text}</span>
-      </div>}
-      {printError && <div className="wr-notice is-error" role="alert">
-        <AlertTriangle size={15} />
-        <span>{printError}</span>
       </div>}
       {(labsQuery.isError || yearsQuery.isError) && <div className="wr-notice is-error" role="alert">
         <AlertTriangle size={15} />

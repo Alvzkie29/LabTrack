@@ -7,6 +7,7 @@ import { getFacultyOptions, type FacultyOption } from "@/api/sessionConfirmation
 import { getAcademicYears, semesterName, type AcademicYear } from "@/api/academicYears";
 import { useRole, canAccess } from "@/contexts/RoleContext";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { conflictsByMeeting, filterSections, findConflicts } from "./schedule/scheduleUtils";
 import { SectionDirectory } from "./schedule/SectionDirectory";
@@ -191,7 +192,8 @@ export function SchedulePage() {
         return next;
       });
       setStickyId(id);
-      setRowStatus(id, { kind: "saved" }, 4000);
+      setRowStatus(id, null);
+      snackbar.success(`Faculty assignment saved for section ${sections.find((section) => section.sectionId === id)?.sectionCode ?? id}.`);
       const req = ++requestId.current;
       fetchSections(ayIdRef.current)
         .then((rows) => {
@@ -203,6 +205,7 @@ export function SchedulePage() {
           if (req === requestId.current) setSectionsState("ready"); // keep the confirmed value already shown
         });
     } catch (e) {
+      snackbar.error(e instanceof ApiError ? e.message : "The server did not accept the faculty change.");
       setRowStatus(id, { kind: "error", message: e instanceof ApiError ? e.message : "The server did not accept the change." });
     } finally {
       savingRef.current.delete(id);

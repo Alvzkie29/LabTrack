@@ -8,7 +8,7 @@ import type { StatusWeek } from "@/api/sessionStatus";
 import { dateLabel, StatusBadge, timeLabel, type CalendarMeeting } from "./calendar-data";
 import { confirmationSessionPath } from "@/utils/sessionConfirmationLink";
 
-interface Props { meeting: CalendarMeeting | null; week: StatusWeek | null; academicYearId?: number; busy: boolean; error: string | null; message: string | null; today: string; onClose: () => void; returnFocus: HTMLElement | null; onSave: (meeting: CalendarMeeting, status: string, note?: string) => Promise<boolean>; }
+interface Props { meeting: CalendarMeeting | null; week: StatusWeek | null; academicYearId?: number; busy: boolean; error: string | null; today: string; onClose: () => void; returnFocus: HTMLElement | null; onSave: (meeting: CalendarMeeting, status: string, note?: string) => Promise<boolean>; }
 export function MeetingInspector(props: Props) {
   return <Sheet open={props.meeting !== null} onOpenChange={open => { if (!open) props.onClose(); }}>
     <SheetContent side="right" className="cs-inspector" onCloseAutoFocus={event => { if (props.returnFocus?.isConnected) { event.preventDefault(); props.returnFocus.focus({ preventScroll: true }); } }}>
@@ -21,7 +21,7 @@ export function MeetingInspector(props: Props) {
     </SheetContent>
   </Sheet>;
 }
-function InspectorBody({ meeting, week, academicYearId, busy, error, message, today, onSave }: Props & { meeting: CalendarMeeting; week: StatusWeek }) {
+function InspectorBody({ meeting, week, academicYearId, busy, error, today, onSave }: Props & { meeting: CalendarMeeting; week: StatusWeek }) {
   const { role } = useRole(); const [noteFor, setNoteFor] = useState(false); const [note, setNote] = useState("");
   const { row, cell } = meeting; const confirmation = cell.source === "confirmation";
   const statuses = week.statuses.filter(status => status !== "On-site" && status !== "Virtual");
@@ -102,7 +102,7 @@ function InspectorBody({ meeting, week, academicYearId, busy, error, message, to
       <strong>Recorded remarks</strong>
       <p>{cell.note}</p>
     </div>}
-    {error && <div className="cs-notice is-error" role="alert">{error}</div>}{message && <div className="cs-notice is-success" role="status">{message}</div>}
+    {error && <div className="cs-notice is-error" role="alert">{error}</div>}
     <div className="cs-shared-note">
       <Info size={14} />
       <p>Class status is recorded once per section and date. If this section has multiple meetings that day, they share the same status and remarks.</p>

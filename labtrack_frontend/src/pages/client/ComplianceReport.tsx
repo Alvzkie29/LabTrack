@@ -22,6 +22,7 @@ import { getAcademicYears, semesterName, type AcademicYear } from "@/api/academi
 import { getCourseSections, getSectionUtilization, type CourseSectionSummary, type SectionUtilization } from "@/api/courseSections";
 import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
 import { downloadCsv } from "@/utils/csv";
+import { snackbar } from "@/utils/snackbar";
 import "./compliance-report.css";
 
 type TermFilter = "all" | "1" | "2" | "sem";
@@ -144,8 +145,8 @@ export function ComplianceReportPage() {
   const meetings = (r: CourseSectionSummary) =>
     r.meetings.map((m) => `${m.dayOfWeek.slice(0, 3)} ${m.laboratory.roomCode}`).join(", ");
 
-  const exportCsv = () =>
-    downloadCsv(
+  const exportCsv = () => {
+    try { downloadCsv(
       `ched-compliance_${ay?.label ?? "report"}${labRoom ? `_${labRoom}` : ""}`,
       rows.map((r) => ({
         "Class code": r.sectionCode,
@@ -158,7 +159,8 @@ export function ComplianceReportPage() {
         Status: r.compliance ? STATUS_LABEL[r.compliance.status] : "",
         "Utilization % (confirmed sessions)": utilizationText(r.sectionId),
       })),
-    );
+    ); } catch (error) { snackbar.error(error instanceof Error ? error.message : "Could not prepare the compliance CSV."); }
+  };
 
   function openSection(section: CourseSectionSummary, element: HTMLElement) {
     setReturnFocus(element);

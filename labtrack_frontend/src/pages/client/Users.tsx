@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  AlertTriangle, Check, CircleAlert, Eye, EyeOff, Loader2, Lock, Plus, Power, RefreshCw, Search, ShieldCheck,
+  AlertTriangle, CircleAlert, Eye, EyeOff, Loader2, Lock, Plus, Power, RefreshCw, Search, ShieldCheck,
   UserPlus, UserRoundX, Users, X,
 } from "lucide-react";
 import { useRole, ROLES, type Role } from "@/contexts/RoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUsers, updateUserStatus, adminCreateUser, type UserListItem } from "@/api/users";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
 import "./users.css";
 
 type StatusFilter = "all" | "active" | "disabled";
@@ -53,8 +54,6 @@ export function UsersPage() {
   const busyRef = useRef(false);
   const [confirm, setConfirm] = useState<UserListItem | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   const loadUsers = () =>
@@ -97,16 +96,16 @@ export function UsersPage() {
   async function setActive(user: UserListItem, active: boolean, fromDialog: boolean) {
     if (busyRef.current) return;
     busyRef.current = true;
-    setBusyId(user.id); setError(null); setDialogError(null); setMessage(null);
+    setBusyId(user.id); setDialogError(null);
     try {
       await updateUserStatus(user.id, active);
       setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isActive: active } : u)));
-      setMessage(active ? `${user.fullName} can sign in again.` : `${user.fullName} is disabled. Their records are kept.`);
+      snackbar.success(active ? `${user.fullName} can sign in again.` : `${user.fullName} is disabled. Their records are kept.`);
       setConfirm(null);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to update account status.";
       if (fromDialog) setDialogError(msg);
-      else setError(msg);
+      else snackbar.error(msg);
     } finally {
       busyRef.current = false;
       setBusyId(null);
@@ -127,23 +126,11 @@ export function UsersPage() {
           </div>
           <p>Create, disable, or view any account. Disabling keeps historical attendance and confirmation records intact.</p>
         </div>
-        <button type="button" className="ua-btn is-primary is-lg" onClick={() => { setMessage(null); setError(null); setShowCreateForm(true); }}>
+        <button type="button" className="ua-btn is-primary is-lg" onClick={() => setShowCreateForm(true)}>
           <Plus size={15} className="ua-gold" /> New account
         </button>
       </header>
 
-      {message && (
-        <div className="ua-alert is-ok" role="status">
-          <Check size={14} /> <span>{message}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setMessage(null)}><X size={13} /></button>
-        </div>
-      )}
-      {error && (
-        <div className="ua-alert is-error" role="alert">
-          <CircleAlert size={14} /> <span>{error}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setError(null)}><X size={13} /></button>
-        </div>
-      )}
 
       <section className="ua-card" aria-label="Accounts">
         <div className="ua-toolbar">
@@ -277,7 +264,7 @@ export function UsersPage() {
           onClose={() => setShowCreateForm(false)}
           onCreated={(name) => {
             setShowCreateForm(false);
-            setMessage(`Account created for ${name}.`);
+            snackbar.success(`Account created for ${name}.`);
             loadUsers();
           }}
         />

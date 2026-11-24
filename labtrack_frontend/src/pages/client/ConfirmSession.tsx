@@ -12,6 +12,7 @@ import {
   type FacultyOption, type ConfirmationRow,
 } from "@/api/sessionConfirmations";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
 
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import "./confirm-session.css";
@@ -79,7 +80,6 @@ export function ConfirmSessionsPage() {
   const actionLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (busy || appliedNavigation === navigationKey) return;
@@ -152,7 +152,7 @@ export function ConfirmSessionsPage() {
 
   useEffect(() => {
     const version = ++generation.current;
-    setError(null); setSuccess(null); setDetail(null); setAttendance(null);
+    setError(null); setDetail(null); setAttendance(null);
     setPending(null); setCompleted(null); setFaculty([]); setFacultyId("");
     setPin(""); setNotes(""); setSearch(""); setAttendanceTab("present");
     const canLoad = !initialLoading && !initialError && sectionKnown && appliedNavigation === navigationKey && !!sectionId && !!sessionDate;
@@ -190,18 +190,19 @@ export function ConfirmSessionsPage() {
 
   if (!allowed) return <Restricted />;
 
-  const run = async (action: () => Promise<string>) => {
+  const run = async (action: () => Promise<string | { message: string; warning: true }>) => {
     if (actionLock.current) return;
     actionLock.current = true;
     setError(null);
-    setSuccess(null);
     setBusy(true);
     try {
-      setSuccess(await action());
+      const feedback = await action();
+      if (typeof feedback === "string") snackbar.success(feedback);
+      else snackbar.warning(feedback.message, { duration: 10000 });
       setQueueRevision((n) => n + 1);
       try { await refresh(); } catch { setError("Saved, but the refreshed session could not be loaded. Reload the session before continuing."); setDetail(null); setAttendance(null); }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      snackbar.error(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       actionLock.current = false;
       setBusy(false);
@@ -315,10 +316,6 @@ export function ConfirmSessionsPage() {
         <AlertTriangle size={17} />
         <span>{error}</span>
       </div>}
-      {success && <div className="confirm-notice is-success" role="status">
-        <CheckCircle2 size={17} />
-        <span>{success}</span>
-      </div>}
 
       {linkedSession.pendingView && !linkedSession.invalid && !initialLoading && !initialError && <PendingConfirmations
         sections={sections} labId={labId} ayId={linkedSession.ayId} sectionId={sectionId} sessionDate={sessionDate}
@@ -378,7 +375,7 @@ export function ConfirmSessionsPage() {
             </div>
           </div>
           <div className="confirm-action-body">
-            <div className="confirm-mode" aria-label="Session type">{(["physical", "virtual"] as const).map((m) => <button key={m} aria-pressed={mode === m} disabled={busy} className={mode === m ? "is-active" : ""} onClick={() => { setMode(m); setPin(""); setNotes(""); setError(null); setSuccess(null); }}>{m === "physical" ? <Monitor size={14} /> : <Video size={14} />}{m === "physical" ? "Physical class" : "Virtual class"}</button>)}</div>
+            <div className="confirm-mode" aria-label="Session type">{(["physical", "virtual"] as const).map((m) => <button key={m} aria-pressed={mode === m} disabled={busy} className={mode === m ? "is-active" : ""} onClick={() => { setMode(m); setPin(""); setNotes(""); setError(null); }}>{m === "physical" ? <Monitor size={14} /> : <Video size={14} />}{m === "physical" ? "Physical class" : "Virtual class"}</button>)}</div>
             <fieldset disabled={!ready || busy} className="confirm-action-fields">
               {mode === "physical" && completed ? <div className="confirm-completed">
                 <CheckCircle2 size={29} />
@@ -467,9 +464,10 @@ export function ConfirmSessionsPage() {
                     failed.push(`${e.name}: ${err instanceof ApiError ? err.message : "failed"}`);
                   }
                 }
-                if (saved === 0) throw new ApiError(400, failed.join(" | "));
-                return `${saved} student${saved === 1 ? "" : "s"} marked present.` +
-                  (failed.length ? ` Not saved: ${failed.join(" | ")}` : "");
+                if (failed.length) setError(`Manual attendance entries not saved: ${failed.join(" | ")}`);
+                if (saved === 0) throw new ApiError(400, "No manual attendance entries were saved. Review the student details and try again.");
+                const message = `${saved} student${saved === 1 ? "" : "s"} marked present.`;
+                return failed.length ? { message: `${message} ${failed.length} could not be saved; review the student details.`, warning: true as const } : message;
               })
             }
           />

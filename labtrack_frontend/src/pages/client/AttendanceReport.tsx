@@ -28,6 +28,7 @@ import { getCourseSections, type CourseSectionSummary } from "@/api/courseSectio
 import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
 import { getAttendanceReport, type AttendanceReportRow } from "@/api/attendance";
 import { downloadCsv } from "@/utils/csv";
+import { snackbar } from "@/utils/snackbar";
 import "./attendance-report.css";
 
 type Sort = "latest" | "earliest" | "student" | "section" | "workstation";
@@ -176,7 +177,7 @@ export function AttendanceReportsPage() {
   };
 
   const exportCsv = () => {
-    downloadCsv(
+    try { downloadCsv(
       `attendance-report_${from}_to_${to}`,
       rows.map((r) => ({
         Student: r.student,
@@ -187,7 +188,7 @@ export function AttendanceReportsPage() {
         "PC": r.pcIdentifier,
         Notes: r.notes ?? "",
       })),
-    );
+    ); } catch (error) { snackbar.error(error instanceof Error ? error.message : "Could not prepare the attendance CSV."); }
   };
 
   function openRecord(row: AttendanceReportRow, element: HTMLElement) {

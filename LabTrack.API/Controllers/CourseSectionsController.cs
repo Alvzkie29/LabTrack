@@ -226,6 +226,16 @@ public class CourseSectionsController : ControllerBase
                 .ToListAsync(),
             section.FacultyId,
             Faculty = section.Faculty?.FullName,
+            FacultyDetails = section.Faculty is not null
+                && (User.IsInRole("Administrator") || User.IsInRole("Custodian") || User.IsInRole("LabAssistant"))
+                ? new
+                {
+                    section.Faculty.FullName,
+                    section.Faculty.SchoolId,
+                    section.Faculty.Email,
+                    section.Faculty.IsActive
+                }
+                : null,
             section.HasInstructorAssigned,
             Meetings = MeetingsOf(section),
             Compliance = progress is null ? null : new
@@ -568,7 +578,7 @@ public class CourseSectionsController : ControllerBase
         var roster = await _db.SectionEnrollments
             .Where(e => e.SectionId == id)
             .OrderBy(e => e.Student.LastName).ThenBy(e => e.Student.FirstName)
-            .Select(e => new { e.StudentId, e.Student.SchoolId, Name = e.Student.FullName })
+            .Select(e => new { e.StudentId, e.Student.SchoolId, Name = e.Student.FullName, e.Student.Email })
             .ToListAsync();
 
         return Ok(roster);

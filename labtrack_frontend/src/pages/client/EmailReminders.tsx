@@ -6,6 +6,7 @@ import {
 import { useRole } from "@/contexts/RoleContext";
 import { getReminders, sendRemindersNow, sendTestReminder, setAutoSend, type RemindersPreview } from "@/api/reminders";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
 import "./email-reminders.css";
 
 type ReminderClass = RemindersPreview["classes"][number];
@@ -36,8 +37,6 @@ export function EmailRemindersPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | "test" | "send" | "auto">(null);
   const busyRef = useRef(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "send" | "autoOn" | "autoOff">(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
@@ -101,16 +100,16 @@ export function EmailRemindersPage() {
   const run = async (kind: "test" | "send" | "auto", work: () => Promise<string>, inDialog: boolean) => {
     if (busyRef.current) return;
     busyRef.current = true;
-    setBusy(kind); setMessage(null); setError(null); setDialogError(null);
+    setBusy(kind); setDialogError(null);
     try {
       const text = await work();
-      setMessage(text);
+      snackbar.success(text);
       setDialog(null);
       await load();
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Something went wrong.";
       if (inDialog) setDialogError(msg);
-      else setError(msg);
+      else snackbar.error(msg);
     } finally {
       busyRef.current = false;
       setBusy(null);
@@ -172,18 +171,6 @@ export function EmailRemindersPage() {
         <p>The numbers on this page come from the server; this page does not recalculate them.</p>
       </details>
 
-      {message && (
-        <div className="er-alert is-ok" role="status">
-          <CheckCircle2 size={14} /> <span>{message}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setMessage(null)}><X size={13} /></button>
-        </div>
-      )}
-      {error && (
-        <div className="er-alert is-error" role="alert">
-          <CircleAlert size={14} /> <span>{error}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setError(null)}><X size={13} /></button>
-        </div>
-      )}
 
       <div className="er-layout">
         {/* ── Queue ─────────────────────────────── */}

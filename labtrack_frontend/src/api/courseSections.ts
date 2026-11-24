@@ -51,6 +51,12 @@ export interface CourseSectionDetail {
   }[];
   facultyId: string | null;
   faculty: string | null;
+  facultyDetails?: {
+    fullName: string;
+    schoolId: string;
+    email: string | null;
+    isActive: boolean;
+  } | null;
   hasInstructorAssigned: boolean;
   meetings: Meeting[];
   compliance: (Compliance & { updatedAt: string }) | null;
@@ -59,6 +65,17 @@ export interface CourseSectionDetail {
 
 export function getCourseSection(id: number) {
   return apiRequest<CourseSectionDetail>(`/api/coursesections/${id}`);
+}
+
+export interface CourseRosterStudent {
+  studentId: string;
+  schoolId: string;
+  name: string;
+  email: string | null;
+}
+
+export function getCourseRoster(sectionId: number) {
+  return apiRequest<CourseRosterStudent[]>(`/api/coursesections/${sectionId}/roster`);
 }
 
 /** Assign (or clear, with null) the Faculty member of a class. Custodian and Administrator only. */

@@ -4,6 +4,7 @@ import { useRole } from "@/contexts/RoleContext";
 import { getAcademicYears, semesterName, type AcademicYear } from "@/api/academicYears";
 import { getCourseSections, type CourseSectionSummary } from "@/api/courseSections";
 import { importSchedule, importRoster } from "@/api/imports";
+import { snackbar } from "@/utils/snackbar";
 import { ApiError } from "@/api/client";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { CsvPreview } from "@/components/imports/CsvPreview";
@@ -119,7 +120,6 @@ function ImportPanel({ kind, ayId, active, onActivate, onAdvance, years, loading
   const [sectionError, setSectionError] = useState<string | null>(null);
   const [sectionRetry, setSectionRetry] = useState(0);
   const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<string[]>([]);
   const [problems, setProblems] = useState<string[]>([]);
   const lock = useRef(false);
@@ -130,7 +130,7 @@ function ImportPanel({ kind, ayId, active, onActivate, onAdvance, years, loading
 
   useEffect(() => {
     setSectionId("");
-    setError(null); setLines([]); setProblems([]);
+    setLines([]); setProblems([]);
   }, [ayId]);
 
   useEffect(() => {
@@ -146,7 +146,7 @@ function ImportPanel({ kind, ayId, active, onActivate, onAdvance, years, loading
     return () => { cancelled = true; };
   }, [roster, ayId, reload, sectionRetry]);
 
-  function clearResult() { setError(null); setLines([]); setProblems([]); }
+  function clearResult() { setLines([]); setProblems([]); }
   const canSubmit = !!file && !!year && !loadingYears && !disabled && (!roster || !!section && !loadingSections && !sectionError);
   async function submit() {
     if (!canSubmit || !file || lock.current) return;
@@ -157,12 +157,16 @@ function ImportPanel({ kind, ayId, active, onActivate, onAdvance, years, loading
         const r = await importRoster(Number(sectionId), file);
         setLines([`${r.enrolled} students added to the class`, ...(r.accountsCreated ? [`${r.accountsCreated} new student accounts created`] : []), ...(r.alreadyOnRoster ? [`${r.alreadyOnRoster} already on the class list`] : [])]);
         setProblems(r.errors);
+        if (r.errors.length) snackbar.warning(`Class list imported: ${r.enrolled} students added; ${r.errors.length} rows skipped. Review the results below.`);
+        else snackbar.success(`Class list imported: ${r.enrolled} students added.`);
       } else {
         const r = await importSchedule(Number(ayId), file);
         setLines([`${r.sectionsCreated} classes created`, `${r.meetingsAdded} laboratory meetings added`, ...(r.meetingsAlreadyThere ? [`${r.meetingsAlreadyThere} meetings already registered`] : []), ...(r.subjectsCreated ? [`${r.subjectsCreated} new subjects created`] : [])]);
         setProblems(r.errors); onDone();
+        if (r.errors.length) snackbar.warning(`Schedule imported: ${r.meetingsAdded} meetings added; ${r.errors.length} rows skipped. Review the results below.`);
+        else snackbar.success(`Schedule imported: ${r.sectionsCreated} classes and ${r.meetingsAdded} meetings added.`);
       }
-    } catch (e) { setError(message(e, "Upload failed. Please try again.")); }
+    } catch (e) { snackbar.error(message(e, "Upload failed. Please try again.")); }
     finally { lock.current = false; onImporting(null); }
   }
 
@@ -235,7 +239,7 @@ function ImportPanel({ kind, ayId, active, onActivate, onAdvance, years, loading
           <Info size={13} />{roster ? "Students already enrolled in this section are skipped." : "Existing schedule entries are skipped rather than added twice."}</p>
         <button type="button" className="imports-submit" onClick={submit} disabled={!canSubmit}>{busy ? <Loader2 className="imports-spin" size={16} /> : <Upload size={16} />}{busy ? "Importing file…" : roster ? "Import Class List" : "Import Schedule"}</button>
       </div>
-      <Result error={error} lines={lines} problems={problems} />
+      <Result lines={lines} problems={problems} />
       {!roster && lines.length > 0 && <button className="imports-next" onClick={onAdvance} disabled={disabled}>Continue to Class List <ArrowRight size={15} />
       </button>}
     </div>
@@ -282,12 +286,8 @@ function FilePick({ kind, file, disabled, onPick }: { kind: ImportKind; file: Fi
   </div>;
 }
 
-function Result({ error, lines, problems }: { error: string | null; lines: string[]; problems: string[] }) {
+function Result({ lines, problems }: { lines: string[]; problems: string[] }) {
   return <div className="imports-results">
-    {error && <div className="imports-notice is-error" role="alert">
-      <AlertTriangle size={17} />
-      <span>{error}</span>
-    </div>}
     {lines.length > 0 && <div className="imports-result-success" role="status">
       <div>
         <CheckCircle2 size={17} />

@@ -9,6 +9,7 @@ import {
   TERM_LABELS, type AcademicYear, type SaveAcademicYear, type TermType,
 } from "@/api/academicYears";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
 import "./academic-years.css";
 
 /* ── Dates: plain "YYYY-MM-DD" strings, read as local dates (no UTC shift) ── */
@@ -96,9 +97,7 @@ export function AcademicYearsPage() {
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
-  const [error, setError] = useState<string | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
   const load = () =>
     getAcademicYears()
@@ -123,17 +122,17 @@ export function AcademicYearsPage() {
   const run = async (work: () => Promise<unknown>, done: string, where: "dialog" | "page") => {
     if (busyRef.current) return;
     busyRef.current = true;
-    setBusy(true); setError(null); setDialogError(null); setMessage(null);
+    setBusy(true); setDialogError(null);
     try {
       await work();
-      setMessage(done);
+      snackbar.success(done);
       setEditing(null);
       setConfirm(null);
       await load();
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Something went wrong.";
       if (where === "dialog") setDialogError(msg);
-      else setError(msg);
+      else snackbar.error(msg);
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -152,7 +151,7 @@ export function AcademicYearsPage() {
     );
   };
 
-  const clearNotes = () => { setError(null); setDialogError(null); setMessage(null); };
+  const clearNotes = () => { setDialogError(null); };
   const openNew = () => { clearNotes(); setEditing({ id: null, form: nextSemester(years) }); };
   const openEdit = (y: AcademicYear, focusSecond = false) => {
     clearNotes();
@@ -180,18 +179,6 @@ export function AcademicYearsPage() {
         </button>
       </header>
 
-      {message && (
-        <div className="ay-alert is-ok" role="status">
-          <Check size={14} /> <span>{message}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setMessage(null)}><X size={13} /></button>
-        </div>
-      )}
-      {error && (
-        <div className="ay-alert is-error" role="alert">
-          <CircleAlert size={14} /> <span>{error}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setError(null)}><X size={13} /></button>
-        </div>
-      )}
 
       {loadState === "ready" && (active ? (
         <ActiveSemester y={active} today={today} years={years} onSetSecond={() => openEdit(active, true)} />

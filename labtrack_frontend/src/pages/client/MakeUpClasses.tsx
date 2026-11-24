@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarPlus, Check, CircleAlert, Eye, FileText, Search, Trash2, X } from "lucide-react";
+import { CalendarPlus, CircleAlert, Eye, FileText, Search, Trash2, X } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { getCourseSections, type CourseSectionSummary } from "@/api/courseSections";
 import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
@@ -7,6 +7,7 @@ import {
   createMakeUpClass, deleteMakeUpClass, getMakeUpClasses, openMakeUpAttachment, type MakeUpClass,
 } from "@/api/makeUpClasses";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
 import { MakeUpForm, type MakeUpPayload } from "./makeup/MakeUpForm";
 import { MakeUpDetails } from "./makeup/MakeUpDetails";
 import { SessionBadge } from "./makeup/SessionBadge";
@@ -41,8 +42,6 @@ export function MakeUpClassesPage() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false); // blocks a second submit before React re-renders
   const [formError, setFormError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<MakeUpClass["makeUpId"] | null>(null);
   const [opening, setOpening] = useState(false);
 
@@ -80,19 +79,19 @@ export function MakeUpClassesPage() {
     return <div className="py-24 text-center text-[13px]" style={{ color: "#57606a" }}>This page is only available to staff.</div>;
   }
 
-  const openForm = () => { setShowForm(true); setFormError(null); setError(null); setMessage(null); };
+  const openForm = () => { setShowForm(true); setFormError(null); };
 
   const save = async (p: MakeUpPayload) => {
     if (busyRef.current) return;
     busyRef.current = true;
-    setBusy(true); setFormError(null); setError(null); setMessage(null);
+    setBusy(true); setFormError(null);
     try {
       await createMakeUpClass({
         sectionId: p.sectionId, labId: p.labId, date: p.date,
         startTime: p.startTime, endTime: p.endTime, reason: p.reason, attachment: p.attachment,
       });
       const s = sections.find((x) => x.sectionId === p.sectionId);
-      setMessage(`Make-up class for ${s?.sectionCode ?? "the class"} on ${dateLabel(p.date)} saved. Students can log in for it on the PC Agent that day.`);
+      snackbar.success(`Make-up class for ${s?.sectionCode ?? "the class"} on ${dateLabel(p.date)} saved. Students can log in for it on the PC Agent that day.`);
       setShowForm(false);
       await load();
     } catch (e) {
@@ -108,14 +107,14 @@ export function MakeUpClassesPage() {
     if (busyRef.current) return;
     if (!window.confirm(`Remove the make-up class for ${m.sectionCode} on ${dateLabel(m.date)}?`)) return;
     busyRef.current = true;
-    setBusy(true); setError(null); setMessage(null);
+    setBusy(true);
     try {
       await deleteMakeUpClass(m.makeUpId);
-      setMessage("Make-up class removed.");
+      snackbar.success("Make-up class removed.");
       setSelectedId(null);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not remove it.");
+      snackbar.error(e instanceof ApiError ? e.message : "Could not remove it.");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -125,7 +124,7 @@ export function MakeUpClassesPage() {
   const openAttachment = (m: MakeUpClass) => {
     setOpening(true);
     openMakeUpAttachment(m.makeUpId)
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Could not open the attachment."))
+      .catch((e) => snackbar.error(e instanceof ApiError ? e.message : "Could not open the attachment."))
       .finally(() => setOpening(false));
   };
 
@@ -144,19 +143,6 @@ export function MakeUpClassesPage() {
           <CalendarPlus size={15} className="mk-gold" /> Add Make-up Class
         </button>
       </header>
-
-      {message && (
-        <div className="mk-alert is-ok mk-banner" role="status">
-          <Check size={14} /> <span>{message}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setMessage(null)}><X size={13} /></button>
-        </div>
-      )}
-      {error && (
-        <div className="mk-alert is-error mk-banner" role="alert">
-          <CircleAlert size={14} /> <span>{error}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setError(null)}><X size={13} /></button>
-        </div>
-      )}
 
       <section className="mk-card">
         {listState === "ready" && list.length > 0 && (
