@@ -30,6 +30,7 @@ import { UsersPage } from "@/pages/client/Users";
 import { SettingsPage } from "@/pages/client/Settings";
 
 import { NotFound } from "@/pages/public/NotFound";
+import { Toaster } from "@/components/ui/sonner";
 
 import "./App.css";
 
@@ -73,6 +74,7 @@ function App() {
 
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <Toaster />
           </BrowserRouter>
         </RoleProvider>
       </AuthProvider>

@@ -1,5 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
-import { CheckCircle2, AlertTriangle, Users } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { confirmationSessionPath, readConfirmationSessionLink } from "@/utils/sessionConfirmationLink";
+import { PendingConfirmations } from "@/components/confirm-session/PendingConfirmations";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { CheckCircle2, AlertTriangle, Users, Building2, CalendarDays, ClipboardCheck, Search, Monitor, Video, ShieldCheck, ArrowRight, RefreshCw } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { getCourseSections, getCourseSection, type CourseSectionSummary, type CourseSectionDetail } from "@/api/courseSections";
 import { getSectionAttendance, recordManualAttendance, type SectionAttendance, type AbsentRow } from "@/api/attendance";
@@ -9,6 +12,10 @@ import {
   type FacultyOption, type ConfirmationRow,
 } from "@/api/sessionConfirmations";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
+
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import "./confirm-session.css";
 
 const MAROON = "#800000";
 const GOLD = "#F4C430";
@@ -17,9 +24,12 @@ const BORDER = "#d1d9e0";
 
 // Local date as yyyy-mm-dd (toISOString would give the UTC date, which is "yesterday" in the early morning in Manila).
 function todayLocal() {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+// The by-section endpoint already returns Philippine wall-clock times.
+function loginTimeLabel(value: string) {
+  const time = value.split("T")[1];
+  return time ? timeLabel(time) : "Time unavailable";
 }
 
 const timeLabel = (t: string) => {
@@ -29,13 +39,19 @@ const timeLabel = (t: string) => {
 
 export function ConfirmSessionsPage() {
   const { role } = useRole();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigationKey = searchParams.toString();
+  const linkedSession = useMemo(() => readConfirmationSessionLink(searchParams), [searchParams]);
+  const [appliedNavigation, setAppliedNavigation] = useState(navigationKey);
+  const [linkedSelection, setLinkedSelection] = useState(!!linkedSession.sectionId);
+  const [autoSelectPending, setAutoSelectPending] = useState(linkedSession.pendingView && !linkedSession.invalid && !linkedSession.sectionId);
   const allowed = role === "Custodian" || role === "Administrator" || role === "LabAssistant";
 
   const [sections, setSections] = useState<CourseSectionSummary[]>([]);
   const [labs, setLabs] = useState<LaboratorySummary[]>([]);
-  const [labId, setLabId] = useState<number | "">("");
-  const [sectionId, setSectionId] = useState<number | "">("");
-  const [sessionDate, setSessionDate] = useState(todayLocal());
+  const [labId, setLabId] = useState<number | "">(linkedSession.labId ?? "");
+  const [sectionId, setSectionId] = useState<number | "">(linkedSession.sectionId ?? "");
+  const [sessionDate, setSessionDate] = useState(linkedSession.date ?? todayLocal());
   const [mode, setMode] = useState<"physical" | "virtual">("physical");
 
   const [detail, setDetail] = useState<CourseSectionDetail | null>(null);
@@ -51,32 +67,76 @@ export function ConfirmSessionsPage() {
   // Manual attendance: the PCs of the lab this class meets in on the chosen date.
   const [labPcs, setLabPcs] = useState<WorkstationEntry[]>([]);
 
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialError, setInitialError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [pcMessage, setPcMessage] = useState("");
+  const [completed, setCompleted] = useState<ConfirmationRow | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [queueRevision, setQueueRevision] = useState(0);
+  const [attendanceTab, setAttendanceTab] = useState<"present" | "absent" | "other">("present");
+  const [search, setSearch] = useState("");
+  const generation = useRef(0);
+  const actionLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (busy || appliedNavigation === navigationKey) return;
+    setLabId(linkedSession.labId ?? "");
+    setSectionId(linkedSession.sectionId ?? "");
+    setSessionDate(linkedSession.date ?? todayLocal());
+    setMode("physical");
+    setLinkedSelection(!!linkedSession.sectionId);
+    setAutoSelectPending(linkedSession.pendingView && !linkedSession.invalid && !linkedSession.sectionId);
+    setAppliedNavigation(navigationKey);
+  }, [navigationKey, appliedNavigation, linkedSession, busy]);
 
   useEffect(() => {
     if (!allowed) return;
-    getCourseSections().then(setSections).catch(() => setSections([]));
-    getLaboratories().then(setLabs).catch(() => setLabs([]));
-  }, [allowed]);
+    let cancelled = false;
+    setInitialLoading(true);
+    setInitialError(null);
+    Promise.all([getCourseSections(linkedSession.ayId ? { ayId: linkedSession.ayId } : undefined), getLaboratories()])
+      .then(([classes, laboratories]) => { if (!cancelled) { setSections(classes); setLabs(laboratories); } })
+      .catch((e) => { if (!cancelled) setInitialError(e instanceof ApiError ? e.message : "Could not load laboratories and classes."); })
+      .finally(() => { if (!cancelled) setInitialLoading(false); });
+    return () => { cancelled = true; };
+  }, [allowed, retry, linkedSession.ayId]);
 
   // Narrow the class list to the lab the staff member is working in.
-  const shown = labId === "" ? sections : sections.filter((s) => s.meetings.some((m) => m.laboratory.labId === labId));
+  const shown = useMemo(() => labId === "" ? sections : sections.filter((s) =>
+    s.meetings.some((m) => m.laboratory.labId === labId)
+    || detail?.sectionId === s.sectionId && detail.makeUps?.some((m) => m.labId === labId && m.date.slice(0, 10) === sessionDate)),
+    [sections, labId, detail, sessionDate]);
+  const sectionKnown = sections.some((s) => s.sectionId === sectionId);
+  const linkedMissing = linkedSelection && !initialLoading && !initialError && !sectionKnown;
+  const selectionScope = `${sectionId}/${sessionDate}/${linkedSession.ayId ?? "active"}`;
+  const activeSelection = useRef(selectionScope);
+  activeSelection.current = selectionScope;
 
-  // Clear the chosen class if it is not held in the chosen lab.
+  // Preserve a linked class while its period and make-up meeting details are loading.
   useEffect(() => {
-    if (sectionId !== "" && !shown.some((s) => s.sectionId === sectionId)) setSectionId("");
-  }, [labId, shown, sectionId]);
+    if (initialLoading || initialError || sectionId === "" || shown.some((s) => s.sectionId === sectionId)) return;
+    if (linkedSelection) {
+      if (detail && sectionKnown) setLabId("");
+    } else setSectionId("");
+  }, [initialLoading, initialError, shown, sectionId, linkedSelection, detail, sectionKnown]);
 
   const refresh = useCallback(async () => {
-    if (!sectionId) return;
+    if (!sectionId || !sessionDate || activeSelection.current !== selectionScope) return;
+    const version = generation.current;
     const id = Number(sectionId);
-    const [d, att, confs] = await Promise.all([
+    const [d, att, confs, opts] = await Promise.all([
       getCourseSection(id),
       getSectionAttendance(id, sessionDate),
       getConfirmationsBySection(id),
+      getFacultyOptions(id),
     ]);
+    if (generation.current !== version || activeSelection.current !== selectionScope) return;
+    setFaculty(opts);
+    setFacultyId((current) => opts.some((f) => f.id === current) ? current : opts[0]?.id ?? "");
+    setCompleted(confs.find((c) => c.sessionType === "Physical" && c.sessionDate.slice(0, 10) === sessionDate && c.finalConfirmedAt) ?? null);
     setDetail(d);
     setAttendance(att);
     setPending(
@@ -88,49 +148,63 @@ export function ConfirmSessionsPage() {
           !c.finalConfirmedAt,
       ) ?? null,
     );
-  }, [sectionId, sessionDate]);
+  }, [sectionId, sessionDate, selectionScope]);
 
   useEffect(() => {
-    setError(null);
-    setSuccess(null);
-    setDetail(null);
-    setAttendance(null);
-    setPending(null);
-    setPin("");
-    if (!sectionId) return;
-    refresh().catch((e) => setError(e instanceof ApiError ? e.message : "Could not load this class."));
-    getFacultyOptions(Number(sectionId)).then((opts) => {
-      setFaculty(opts);
-      setFacultyId(opts[0]?.id ?? "");
-    });
-  }, [sectionId, sessionDate, refresh]);
+    const version = ++generation.current;
+    setError(null); setDetail(null); setAttendance(null);
+    setPending(null); setCompleted(null); setFaculty([]); setFacultyId("");
+    setPin(""); setNotes(""); setSearch(""); setAttendanceTab("present");
+    const canLoad = !initialLoading && !initialError && sectionKnown && appliedNavigation === navigationKey && !!sectionId && !!sessionDate;
+    setLoading(canLoad);
+    if (canLoad) {
+      refresh().catch((e) => {
+        if (generation.current === version) setError(e instanceof ApiError ? e.message : "Could not load this class.");
+      }).finally(() => { if (generation.current === version) setLoading(false); });
+    }
+    return () => { generation.current++; };
+  }, [sectionId, sessionDate, refresh, retry, initialLoading, initialError, sectionKnown, appliedNavigation, navigationKey]);
 
   useEffect(() => {
-    setLabPcs([]);
-    if (!detail) return;
+    let cancelled = false;
+    setLabPcs([]); setPcMessage("");
+    if (!detail || !sessionDate) return;
     const weekday = new Date(sessionDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
     const labIds = [...new Set([
       ...detail.meetings.filter((m) => m.dayOfWeek === weekday).map((m) => m.laboratory.labId),
       ...(detail.makeUps ?? []).filter((m) => m.date.slice(0, 10) === sessionDate).map((m) => m.labId), // a make-up class that day
     ])];
-    if (labIds.length === 0) return;
+    if (labIds.length === 0) { setPcMessage("No laboratory meeting or make-up class on this date."); return; }
+    setPcMessage("Loading available workstations…");
     Promise.all(labIds.map((id) => getLabWorkstations(id)))
-      .then((lists) => setLabPcs(lists.flat().filter((w) => w.isActive)))
-      .catch(() => setLabPcs([]));
+      .then((lists) => { if (!cancelled) { const pcs = lists.flat().filter((w) => w.isActive); setLabPcs(pcs); setPcMessage(pcs.length ? "" : "No active workstations are available for this session."); } })
+      .catch(() => { if (!cancelled) setPcMessage("Could not load workstations. Reload the session to try again."); });
+    return () => { cancelled = true; };
   }, [detail, sessionDate]);
+
+  const selectPending = useCallback((id: number, date: string) => {
+    const path = confirmationSessionPath({ sectionId: id, date, labId: labId === "" ? undefined : labId,
+      ayId: linkedSession.ayId, pendingView: true });
+    setSearchParams(path.slice(path.indexOf("?") + 1), { replace: true });
+  }, [labId, linkedSession.ayId, setSearchParams]);
 
   if (!allowed) return <Restricted />;
 
-  const run = async (action: () => Promise<string>) => {
+  const run = async (action: () => Promise<string | { message: string; warning: true }>) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
     setError(null);
-    setSuccess(null);
     setBusy(true);
     try {
-      setSuccess(await action());
-      await refresh();
+      const feedback = await action();
+      if (typeof feedback === "string") snackbar.success(feedback);
+      else snackbar.warning(feedback.message, { duration: 10000 });
+      setQueueRevision((n) => n + 1);
+      try { await refresh(); } catch { setError("Saved, but the refreshed session could not be loaded. Reload the session before continuing."); setDetail(null); setAttendance(null); }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      snackbar.error(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
+      actionLock.current = false;
       setBusy(false);
     }
   };
@@ -161,280 +235,244 @@ export function ConfirmSessionsPage() {
       return `Virtual session recorded — ${r.hoursCredited}h credited. Class now at ${r.compliance.confirmedHoursTotal}/${r.compliance.requiredHours}h (${r.compliance.status}).`;
     });
 
+  const ready = !!detail && !!attendance && !loading && !initialLoading && !initialError && sectionKnown && appliedNavigation === navigationKey && !!sessionDate;
+  const query = search.trim().toLowerCase();
+  const matches = (r: { name: string; schoolId: string }) => `${r.name} ${r.schoolId}`.toLowerCase().includes(query);
+  const visibleCount = attendance ? (attendanceTab === "present" ? attendance.present : attendanceTab === "absent" ? attendance.absent : attendance.notOnRoster).filter(matches).length : 0;
+
+  const physicalVerified = mode === "physical" && !!(pending || completed);
+  const classOptions = shown.map((s) => ({
+    value: String(s.sectionId),
+    label: `${s.subject.code} \u00b7 ${s.sectionCode}`,
+    description: s.subject.title,
+  }));
+  const labOptions = [{ value: "all", label: "All laboratories" }, ...labs.map((lab) => ({
+    value: String(lab.labId), label: lab.name, description: lab.roomCode,
+  }))];
+  const facultyOptions = faculty.map((f) => ({
+    value: f.id, label: f.fullName,
+    description: `${f.schoolId}${f.isAssigned ? " \u00b7 Assigned faculty" : ""}`,
+  }));
+
   return (
-    <div className="space-y-5">
-      <div>
-        <div className="font-mono text-[11px] uppercase tracking-wider" style={{ color: MUTED }}>Session Confirmation</div>
-        <h1 className="mt-1" style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4 }}>Confirm a Session</h1>
-        <p className="mt-0.5 max-w-2xl text-[13px]" style={{ color: MUTED }}>
-          Check the attendance list, have the Faculty member confirm with their PIN, then give the final
-          confirmation. Only the final confirmation credits CHED hours.
-        </p>
-      </div>
+    <div className="confirm-page">
+      <header className="confirm-heading">
+        <div>
+          <p className="confirm-eyebrow">Laboratory management / Session confirmation</p>
+          <h1>Confirm a Session</h1>
+          <p>Review attendance, verify the faculty member, and confirm laboratory hours.</p>
+        </div>
+        <button className="confirm-reload" disabled={busy || loading || initialLoading} onClick={() => setRetry((n) => n + 1)}>
+          <RefreshCw size={14} /> Refresh</button>
+      </header>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 6, padding: 18 }}>
-          <div className="space-y-3.5">
-            <Field label="Laboratory">
-              <select
-                value={labId}
-                onChange={(e) => setLabId(e.target.value ? Number(e.target.value) : "")}
-                className="w-full rounded-md px-3 py-2 text-[13px] outline-none"
-                style={{ border: `1px solid ${BORDER}` }}
-              >
-                <option value="">All laboratories</option>
-                {labs.map((l) => <option key={l.labId} value={l.labId}>{l.roomCode} — {l.name}</option>)}
-              </select>
-            </Field>
+      <ol className="confirm-steps" aria-label="Session confirmation workflow">
+        <li className={ready ? "is-done" : "is-current"}>
+          <span>{ready ? <CheckCircle2 size={16} /> : "01"}</span>
+          <div>
+            <strong>Select a session</strong>
+            <small>Choose a class and date</small>
+          </div>
+        </li>
+        <li className={physicalVerified ? "is-done" : ready ? "is-current" : ""}>
+          <span>{physicalVerified ? <CheckCircle2 size={16} /> : "02"}</span>
+          <div>
+            <strong>{mode === "physical" ? "Faculty verification" : "Review virtual session"}</strong>
+            <small>{mode === "physical" ? "Confirm with a faculty PIN" : "Enter the credited hours"}</small>
+          </div>
+        </li>
+        <li className={completed && mode === "physical" ? "is-done" : pending && mode === "physical" ? "is-current" : ""}>
+          <span>{completed && mode === "physical" ? <CheckCircle2 size={16} /> : "03"}</span>
+          <div>
+            <strong>Credit session hours</strong>
+            <small>{mode === "physical" ? "Complete the final confirmation" : "Save to credit hours immediately"}</small>
+          </div>
+        </li>
+      </ol>
 
-            <Field label="Class">
-              <select
-                value={sectionId}
-                onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : "")}
-                className="w-full rounded-md px-3 py-2 text-[13px] outline-none"
-                style={{ border: `1px solid ${BORDER}` }}
-              >
-                <option value="">Select a class...</option>
-                {shown.map((cs) => (
-                  <option key={cs.sectionId} value={cs.sectionId}>
-                    {cs.sectionCode} — {cs.subject.code} {cs.subject.title}
-                  </option>
-                ))}
-              </select>
-            </Field>
+      <section className="confirm-selection" aria-label="Select session">
+        <div>
+          <label htmlFor="confirm-lab">Laboratory</label>
+          <SearchableSelect id="confirm-lab" ariaLabel="Select laboratory" value={labId === "" ? "all" : String(labId)} onValueChange={(v) => { setAutoSelectPending(false); setLinkedSelection(false); setLabId(v === "all" ? "" : Number(v)); }} disabled={busy || initialLoading || !!initialError} leadingIcon={<Building2 size={16} />} options={labOptions} />
+        </div>
+        <div>
+          <label htmlFor="confirm-class">Course section</label>
+          <SearchableSelect id="confirm-class" ariaLabel="Select course section" placeholder={initialLoading ? "Loading classes…" : "Choose a class"} searchPlaceholder="Search code, subject or section…" emptyMessage="No classes found in this laboratory." value={String(sectionId)} onValueChange={(v) => { setAutoSelectPending(false); setLinkedSelection(false); setSectionId(Number(v)); }} disabled={busy || initialLoading || !!initialError} leadingIcon={<ClipboardCheck size={16} />} options={classOptions} />
+        </div>
+        <div>
+          <label htmlFor="confirm-date">Session date · Philippine time</label>
+          <input id="confirm-date" type="date" value={sessionDate} disabled={busy} onChange={(e) => { setAutoSelectPending(false); setLinkedSelection(false); setSessionDate(e.target.value); }} />
+        </div>
+      </section>
+      {(linkedSession.invalid && sectionId === "" || linkedMissing) && <div className="confirm-notice is-error" role="alert">
+        <AlertTriangle size={17} /><span>{linkedMissing ? "The linked course section is unavailable in this academic period. Choose another class or return to Class Status." : "This session link is incomplete or invalid. Choose a class and date to continue."}</span>
+      </div>}
+      {initialError && <div className="confirm-notice is-error" role="alert">
+        <AlertTriangle size={17} />
+        <span>{initialError}</span>
+        <button onClick={() => setRetry((n) => n + 1)}>Try again</button>
+      </div>}
+      {error && <div className="confirm-notice is-error" role="alert">
+        <AlertTriangle size={17} />
+        <span>{error}</span>
+      </div>}
 
-            <Field label="Session date">
-              <input
-                type="date"
-                value={sessionDate}
-                onChange={(e) => setSessionDate(e.target.value)}
-                className="w-full rounded-md px-3 py-2 text-[13px] outline-none"
-                style={{ border: `1px solid ${BORDER}` }}
-              />
-            </Field>
+      {linkedSession.pendingView && !linkedSession.invalid && !initialLoading && !initialError && <PendingConfirmations
+        sections={sections} labId={labId} ayId={linkedSession.ayId} sectionId={sectionId} sessionDate={sessionDate}
+        busy={busy} retryKey={retry + queueRevision} autoSelect={autoSelectPending} onSelect={selectPending} />}
 
-            <div className="flex gap-1.5">
-              {(["physical", "virtual"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => { setMode(m); setError(null); setSuccess(null); }}
-                  className="flex-1 rounded-md px-3 py-1.5 text-[12.5px] font-medium"
-                  style={{
-                    background: mode === m ? MAROON : "#fff",
-                    color: mode === m ? GOLD : MUTED,
-                    border: `1px solid ${mode === m ? MAROON : BORDER}`,
-                  }}
-                >
-                  {m === "physical" ? "Physical class" : "Virtual class"}
-                </button>
-              ))}
+      <div className="confirm-workspace" aria-busy={loading}>
+        <section className="confirm-review">
+          <div className="confirm-panel-title">
+            <div>
+              <Users size={17} />
+              <h2>Attendance review</h2>
             </div>
+            <span>{sessionDate || "Choose a date"}</span>
+          </div>
+          {!ready ? <div className="confirm-placeholder" role="status">
+            <ClipboardCheck size={31} />
+            <h3>{linkedMissing ? "Linked session unavailable" : loading ? "Loading session…" : sectionId && error ? "Session unavailable" : "Start with a course section"}</h3>
+            <p>{linkedMissing ? "The linked class could not be found in the selected academic period." : loading ? "Retrieving attendance and confirmation records." : sectionId && error ? "Refresh to try loading this session again." : "Select a class and date to review attendance and confirm its hours."}</p>
+          </div> : <>
+            <div className="confirm-class-summary">
+              <span className="confirm-section-code">{detail.sectionCode} <span>{detail.subject.code}</span>
+              </span>
+              <h3>{detail.subject.title}</h3>
+              <p>
+                <CalendarDays size={13} /> {detail.meetings.map((m) => `${m.dayOfWeek.slice(0, 3)} ${timeLabel(m.startTime)}–${timeLabel(m.endTime)} · ${m.laboratory.roomCode}`).join(" / ") || "No regular laboratory schedule"}{detail.termPart ? ` · ${detail.term} only` : ""}</p>
+              {(detail.makeUps ?? []).filter((m) => m.date.slice(0, 10) === sessionDate).map((m) => <p key={m.makeUpId} className="confirm-makeup">Make-up class: {timeLabel(m.startTime)}–{timeLabel(m.endTime)} · {m.roomCode}</p>)}
+              <div className="confirm-hours">
+                <span>Confirmed laboratory hours</span>
+                <strong>{detail.compliance ? `${detail.compliance.confirmedHoursTotal} / ${detail.compliance.requiredHours} hrs` : "Not assessed"}</strong>
+              </div>
+              <div className="confirm-progress" aria-hidden="true">
+                <span style={{ width: `${detail.compliance && detail.compliance.requiredHours > 0 ? Math.max(0, Math.min(100, detail.compliance.confirmedHoursTotal / detail.compliance.requiredHours * 100)) : 0}%` }} />
+              </div>
+            </div>
+            <div className="confirm-attendance-tools">
+              <nav aria-label="Attendance view">{([['present', 'Present', attendance.presentCount], ['absent', 'Absent', attendance.absentCount], ['other', 'Not on roster', attendance.notOnRoster.length]] as const).map(([value, label, count]) => <button key={value} aria-pressed={attendanceTab === value} className={attendanceTab === value ? "is-active" : ""} onClick={() => setAttendanceTab(value)}>{label}<span>{count}</span>
+              </button>)}</nav>
+              <label className="confirm-search">
+                <Search size={15} />
+                <input aria-label="Search students" type="search" placeholder="Search student or school ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </label>
+            </div>
+            <div className="confirm-attendance-body">
+              {attendance.rosterCount === 0 && <p className="confirm-roster-note">No class list has been imported for this section. Import a roster to check who is absent.</p>}
+              {query && visibleCount === 0 ? <p className="confirm-empty-list">No students match “{search}”.</p> : attendanceTab === "absent" ? <AbsentList key={`${sectionId}-${sessionDate}`} rows={attendance.absent.filter(matches)} pcs={labPcs} pcMessage={pcMessage} busy={busy} onMarkPresent={(studentId, workstationId, note) => run(async () => { await recordManualAttendance({ sectionId: Number(sectionId), studentId, date: sessionDate, workstationId, note }); return "Marked present. The entry is labelled as recorded manually."; })} /> : <NameList title={attendanceTab === "present" ? "Present students" : "Logged in, not on roster"} tone={attendanceTab === "present" ? "#536e59" : "#9a6700"} rows={(attendanceTab === "present" ? attendance.present : attendance.notOnRoster).filter(matches).map((r) => ({ key: r.attendanceId, left: `${r.name} · ${r.schoolId}`, right: `${r.workstation} · ${loginTimeLabel(r.loginTime)}${r.notes?.startsWith('Manual entry:') ? ' · Manual entry' : ''}` }))} />}
+            </div>
+            <footer className="confirm-review-footer">
+              <ShieldCheck size={13} /> Attendance entries alone do not credit laboratory hours.</footer>
+          </>}
+        </section>
 
-            {mode === "physical" && !pending && (
-              <>
-                <div className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: MUTED }}>
-                  Step 1 · Faculty confirmation
+        <aside className="confirm-action-panel" aria-label="Session confirmation">
+          <div className="confirm-panel-title">
+            <div>
+              <ShieldCheck size={17} />
+              <h2>Session confirmation</h2>
+            </div>
+          </div>
+          <div className="confirm-action-body">
+            <div className="confirm-mode" aria-label="Session type">{(["physical", "virtual"] as const).map((m) => <button key={m} aria-pressed={mode === m} disabled={busy} className={mode === m ? "is-active" : ""} onClick={() => { setMode(m); setPin(""); setNotes(""); setError(null); }}>{m === "physical" ? <Monitor size={14} /> : <Video size={14} />}{m === "physical" ? "Physical class" : "Virtual class"}</button>)}</div>
+            <fieldset disabled={!ready || busy} className="confirm-action-fields">
+              {mode === "physical" && completed ? <div className="confirm-completed">
+                <CheckCircle2 size={29} />
+                <h3>Session confirmed</h3>
+                <p>{completed.hoursCredited} laboratory hours credited for this date.</p>
+                <small>Final confirmation by {completed.finalConfirmedBy || "staff"}.</small>
+              </div> : mode === "physical" && !pending ? <>
+                <div className="confirm-action-caption">
+                  <span>01 / Faculty verification</span>
+                  <h3>Verify the faculty member</h3>
+                  <p>Have the faculty member enter their PIN after you review the attendance.</p>
                 </div>
-                <Field label="Faculty">
-                  <select
-                    value={facultyId}
-                    onChange={(e) => setFacultyId(e.target.value)}
-                    className="w-full rounded-md px-3 py-2 text-[13px] outline-none"
-                    style={{ border: `1px solid ${BORDER}` }}
-                  >
-                    {faculty.length === 0 && <option value="">No Faculty with a PIN</option>}
-                    {faculty.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.fullName}{f.isAssigned ? " (assigned)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                <div className="confirm-field">
+                  <label htmlFor="confirm-faculty">Faculty member</label>
+                  <SearchableSelect id="confirm-faculty" ariaLabel="Select faculty member" value={facultyId} onValueChange={setFacultyId} disabled={!ready || busy} placeholder={ready ? "No faculty with a PIN" : "Select a class first"} options={facultyOptions} />
+                </div>
                 <Field label="Faculty PIN">
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-                    className="w-full rounded-md px-3 py-2 font-mono text-[13px] outline-none"
-                    style={{ border: `1px solid ${BORDER}` }}
-                  />
+                  <input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="Enter 4–6 digit PIN" />
                 </Field>
-                <PrimaryButton onClick={doFacultyConfirm} disabled={!sectionId || !facultyId || pin.length < 4 || busy}>
-                  {busy ? "Confirming..." : "Faculty confirm"}
-                </PrimaryButton>
-              </>
-            )}
-
-            {mode === "physical" && pending && (
-              <>
-                <div className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: MUTED }}>
-                  Step 2 · Final confirmation
+                <p className="confirm-security-note">
+                  <ShieldCheck size={13} /> PIN verification is required before final confirmation.</p>
+                <PrimaryButton onClick={doFacultyConfirm} disabled={!ready || !facultyId || pin.length < 4 || busy}>{busy ? "Verifying…" : "Verify faculty PIN"}</PrimaryButton>
+                <div className="confirm-next-step">
+                  <ArrowRight size={15} />
+                  <p>
+                    <strong>Next: final confirmation</strong>
+                    <span>Faculty verification alone does not credit hours.</span>
+                  </p>
                 </div>
-                <div className="rounded-md px-3 py-2 text-[12.5px]" style={{ background: "#f6f8fa", border: `1px solid ${BORDER}` }}>
-                  Confirmed by <b>{pending.facultyConfirmedBy}</b> · {pending.hoursCredited}h will be credited.
+              </> : mode === "physical" && pending ? <>
+                <div className="confirm-action-caption">
+                  <span>02 / Final confirmation</span>
+                  <h3>Awaiting final confirmation</h3>
+                  <p>Review the verified session and provide the final confirmation.</p>
+                </div>
+                <div className="confirm-verified">
+                  <CheckCircle2 size={19} />
+                  <div>
+                    <strong>{pending.facultyConfirmedBy || "Faculty verified"}</strong>
+                    <span>{pending.hoursCredited} hours will be credited</span>
+                  </div>
                 </div>
                 <Field label="Notes (optional)">
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                    placeholder="e.g. Class started 20 minutes late"
-                    className="w-full resize-none rounded-md px-3 py-2 text-[13px] outline-none"
-                    style={{ border: `1px solid ${BORDER}` }}
-                  />
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Add any session notes…" />
                 </Field>
-                <PrimaryButton onClick={doFinalConfirm} disabled={busy}>
-                  {busy ? "Confirming..." : "Final confirm and credit hours"}
-                </PrimaryButton>
-              </>
-            )}
-
-            {mode === "virtual" && (
-              <>
-                <div className="text-[12px]" style={{ color: MUTED }}>
-                  Virtual classes need no Faculty signature. The hours are credited right away.
+                <PrimaryButton onClick={doFinalConfirm} disabled={!ready || busy}>{busy ? "Confirming…" : "Final confirm and credit hours"}</PrimaryButton>
+              </> : <>
+                <div className="confirm-action-caption">
+                  <span>Virtual session</span>
+                  <h3>Record virtual class hours</h3>
+                  <p>No faculty PIN is required. Saving this session credits the hours immediately.</p>
                 </div>
-                <Field label="Hours credited">
-                  <input
-                    type="number" min="0.5" step="0.5"
-                    value={virtualHours}
-                    onChange={(e) => setVirtualHours(e.target.value)}
-                    className="w-full rounded-md px-3 py-2 font-mono text-[13px] outline-none"
-                    style={{ border: `1px solid ${BORDER}` }}
-                  />
+                <Field label="Hours to credit">
+                  <input type="number" min="0.5" step="0.5" value={virtualHours} onChange={(e) => setVirtualHours(e.target.value)} />
                 </Field>
                 <Field label="Notes (optional)">
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                    placeholder="e.g. Held on Google Meet"
-                    className="w-full resize-none rounded-md px-3 py-2 text-[13px] outline-none"
-                    style={{ border: `1px solid ${BORDER}` }}
-                  />
+                  <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Held on Google Meet" />
                 </Field>
-                <PrimaryButton onClick={doVirtual} disabled={!sectionId || Number(virtualHours) <= 0 || busy}>
-                  {busy ? "Saving..." : "Record virtual session"}
-                </PrimaryButton>
-              </>
-            )}
-
-            {error && (
-              <div className="flex items-start gap-1.5 text-[12.5px]" style={{ color: "#b42318" }}>
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> {error}
-              </div>
-            )}
-            {success && (
-              <div className="flex items-start gap-1.5 text-[12.5px]" style={{ color: "#1a7f37" }}>
-                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" /> {success}
-              </div>
-            )}
+                <PrimaryButton onClick={doVirtual} disabled={!ready || !Number.isFinite(Number(virtualHours)) || Number(virtualHours) < .5 || Number(virtualHours) % .5 !== 0 || busy}>{busy ? "Saving…" : "Record virtual session"}</PrimaryButton>
+              </>}
+            </fieldset>
           </div>
-        </div>
-
-        <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
-          <div className="px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-wider" style={{ background: "#f6f8fa", color: MUTED, borderBottom: "1px solid #e1e4e8" }}>
-            Class overview
-          </div>
-          {!detail || !attendance ? (
-            <div className="px-4 py-10 text-center text-[13px]" style={{ color: MUTED }}>
-              Select a class to see its attendance and compliance.
-            </div>
-          ) : (
-            <div className="space-y-4 p-4">
-              <div>
-                <div className="font-mono text-[13px] font-semibold" style={{ color: MAROON }}>{detail.sectionCode}</div>
-                <div className="mt-0.5 text-[13px]">{detail.subject.code} — {detail.subject.title}</div>
-                <div className="mt-0.5 text-[12px]" style={{ color: MUTED }}>
-                  {detail.meetings
-                    .map((m) => `${m.dayOfWeek.slice(0, 3)} ${timeLabel(m.startTime)}–${timeLabel(m.endTime)} · ${m.laboratory.roomCode}`)
-                    .join("  |  ")}
-                  {detail.termPart && ` · ${detail.term} only`}
-                </div>
-                {(detail.makeUps ?? []).filter((m) => m.date.slice(0, 10) === sessionDate).map((m) => (
-                  <div key={m.makeUpId} className="mt-1 text-[12px] font-semibold" style={{ color: MAROON }}>
-                    Make-up class this day: {timeLabel(m.startTime)}–{timeLabel(m.endTime)} · {m.roomCode}
-                  </div>
-                ))}
-                {detail.compliance && (
-                  <div className="mt-2">
-                    <div style={{ height: 6, background: "#e1e4e8", borderRadius: 999 }}>
-                      <div style={{
-                        width: `${Math.min(100, Math.round((detail.compliance.confirmedHoursTotal / detail.compliance.requiredHours) * 100))}%`,
-                        height: "100%", background: MAROON, borderRadius: 999,
-                      }} />
-                    </div>
-                    <div className="mt-1 font-mono text-[11.5px]" style={{ color: MUTED }}>
-                      {detail.compliance.confirmedHoursTotal}/{detail.compliance.requiredHours}h · {detail.compliance.status}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-3" style={{ borderTop: "1px solid #e1e4e8" }}>
-                <div className="flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-wider" style={{ color: MUTED }}>
-                  <Users className="size-3" /> Attendance · {attendance.presentCount} present / {attendance.absentCount} absent
-                  {attendance.notOnRoster.length > 0 && ` / ${attendance.notOnRoster.length} not on roster`}
-                </div>
-                {attendance.rosterCount === 0 && attendance.notOnRoster.length === 0 ? (
-                  <div className="mt-2 text-[12px]" style={{ color: MUTED }}>
-                    No class list yet. Import one for this class.
-                  </div>
-                ) : (
-                  <div className="mt-2 space-y-3">
-                    <NameList title="Present" tone="#1a7f37"
-                      rows={attendance.present.map((r) => ({ key: r.attendanceId, left: r.name, right: `${r.workstation} · ${new Date(r.loginTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` }))} />
-                    <AbsentList
-                      rows={attendance.absent}
-                      pcs={labPcs}
-                      onMarkPresent={(studentId, workstationId, note) =>
-                        run(async () => {
-                          await recordManualAttendance({ sectionId: Number(sectionId), studentId, date: sessionDate, workstationId, note });
-                          return "Marked present. The entry is labelled as recorded manually.";
-                        })
-                      }
-                    />
-                    <NameList title="Logged in, not on roster" tone="#9a6700"
-                      rows={attendance.notOnRoster.map((r) => ({ key: r.attendanceId, left: r.name, right: r.workstation }))} />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        </aside>
       </div>
-
-      {attendance && attendance.absent.length > 1 && (
-        <BulkManual
-          key={`${sectionId}-${sessionDate}`}
-          rows={attendance.absent}
-          pcs={labPcs}
-          busy={busy}
-          onSubmit={(entries, note) =>
-            run(async () => {
-              let saved = 0;
-              const failed: string[] = [];
-              // One request per student, in order, so one bad row does not stop the rest.
-              for (const e of entries) {
-                try {
-                  await recordManualAttendance({
-                    sectionId: Number(sectionId), studentId: e.studentId, date: sessionDate,
-                    workstationId: e.workstationId, note,
-                  });
-                  saved++;
-                } catch (err) {
-                  failed.push(`${e.name}: ${err instanceof ApiError ? err.message : "failed"}`);
+      <div className="confirm-paper-wrap">
+        {attendance && attendance.absent.length > 1 && (
+          <BulkManual
+            key={`${sectionId}-${sessionDate}`}
+            rows={attendance.absent}
+            pcs={labPcs}
+            busy={busy}
+            pcMessage={pcMessage}
+            onSubmit={(entries, note) =>
+              run(async () => {
+                let saved = 0;
+                const failed: string[] = [];
+                // One request per student, in order, so one bad row does not stop the rest.
+                for (const e of entries) {
+                  try {
+                    await recordManualAttendance({
+                      sectionId: Number(sectionId), studentId: e.studentId, date: sessionDate,
+                      workstationId: e.workstationId, note,
+                    });
+                    saved++;
+                  } catch (err) {
+                    failed.push(`${e.name}: ${err instanceof ApiError ? err.message : "failed"}`);
+                  }
                 }
-              }
-              if (saved === 0) throw new ApiError(400, failed.join(" | "));
-              return `${saved} student${saved === 1 ? "" : "s"} marked present.` +
-                (failed.length ? ` Not saved: ${failed.join(" | ")}` : "");
-            })
-          }
-        />
-      )}
+                if (failed.length) setError(`Manual attendance entries not saved: ${failed.join(" | ")}`);
+                if (saved === 0) throw new ApiError(400, "No manual attendance entries were saved. Review the student details and try again.");
+                const message = `${saved} student${saved === 1 ? "" : "s"} marked present.`;
+                return failed.length ? { message: `${message} ${failed.length} could not be saved; review the student details.`, warning: true as const } : message;
+              })
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -443,10 +481,11 @@ export function ConfirmSessionsPage() {
  * For an outage, when the whole class was recorded on paper: tick the students who were
  * present, pick each one's PC, give one reason, and save them together.
  */
-function BulkManual({ rows, pcs, busy, onSubmit }: {
+function BulkManual({ rows, pcs, busy, pcMessage, onSubmit }: {
   rows: AbsentRow[];
   pcs: WorkstationEntry[];
   busy: boolean;
+  pcMessage: string;
   onSubmit: (entries: { studentId: string; name: string; workstationId: number }[], note: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -467,8 +506,8 @@ function BulkManual({ rows, pcs, busy, onSubmit }: {
     });
 
   return (
-    <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
-      <button type="button" onClick={() => setOpen((o) => !o)}
+    <section className="confirm-paper">
+      <button type="button" aria-expanded={open} disabled={busy} onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between px-4 py-2.5 text-left">
         <span>
           <span className="text-[13px] font-semibold">Record attendance from a paper sheet</span>
@@ -480,124 +519,128 @@ function BulkManual({ rows, pcs, busy, onSubmit }: {
       </button>
 
       {open && (
-        <div className="space-y-3 px-4 pb-4" style={{ borderTop: "1px solid #e1e4e8" }}>
-          {pcs.length === 0 ? (
-            <div className="pt-3 text-[12.5px]" style={{ color: MUTED }}>
-              This class has no laboratory meeting on this day of the week, so there is no PC to record.
-            </div>
-          ) : (
-            <>
-              <div className="max-h-80 overflow-auto pt-2">
-                <table className="w-full text-[12.5px]">
-                  <tbody>
-                    {rows.map((r) => {
-                      const on = r.studentId in picked;
-                      return (
-                        <tr key={r.studentId} style={{ borderBottom: "1px solid #f0f2f4" }}>
-                          <td className="w-8 py-1.5">
-                            <input type="checkbox" checked={on} onChange={() => toggle(r.studentId)} aria-label={`Present: ${r.name}`} />
-                          </td>
-                          <td className="py-1.5 pr-3">{r.name}</td>
-                          <td className="py-1.5 pr-3 font-mono text-[11.5px]" style={{ color: MUTED }}>{r.schoolId}</td>
-                          <td className="w-56 py-1.5">
-                            {on && (
-                              <select
-                                value={picked[r.studentId]}
-                                onChange={(e) => setPicked((p) => ({ ...p, [r.studentId]: e.target.value ? Number(e.target.value) : "" }))}
-                                className="w-full rounded px-2 py-1 text-[12px] outline-none"
-                                style={{ border: `1px solid ${picked[r.studentId] === "" ? MAROON : BORDER}`, background: "#fff" }}
-                              >
-                                <option value="">PC used...</option>
-                                {pcs.map((w) => (
-                                  <option key={w.workstationId} value={w.workstationId}
-                                    disabled={usedPcs.has(w.workstationId) && picked[r.studentId] !== w.workstationId}>
-                                    {w.seatLabel} ({w.pcIdentifier})
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+        <fieldset disabled={busy} className="confirm-manual-fields">
+          <div className="space-y-3 px-4 pb-4" style={{ borderTop: "1px solid #e1e4e8" }}>
+            {pcs.length === 0 ? (
+              <div className="pt-3 text-[12.5px]" style={{ color: MUTED }}>
+                {pcMessage || "No active workstations are available for this session."}
               </div>
+            ) : (
+              <>
+                <div className="max-h-80 overflow-auto pt-2">
+                  <table className="w-full text-[12.5px]">
+                    <tbody>
+                      {rows.map((r) => {
+                        const on = r.studentId in picked;
+                        return (
+                          <tr key={r.studentId} style={{ borderBottom: "1px solid #f0f2f4" }}>
+                            <td className="w-8 py-1.5">
+                              <input type="checkbox" checked={on} onChange={() => toggle(r.studentId)} aria-label={`Present: ${r.name}`} />
+                            </td>
+                            <td className="py-1.5 pr-3">{r.name}</td>
+                            <td className="py-1.5 pr-3 font-mono text-[11.5px]" style={{ color: MUTED }}>{r.schoolId}</td>
+                            <td className="w-56 py-1.5">
+                              {on && (
+                                <select
+                                  aria-label={`Workstation for ${r.name}`} value={picked[r.studentId]}
+                                  onChange={(e) => setPicked((p) => ({ ...p, [r.studentId]: e.target.value ? Number(e.target.value) : "" }))}
+                                  className="w-full rounded px-2 py-1 text-[12px] outline-none"
+                                  style={{ border: `1px solid ${picked[r.studentId] === "" ? MAROON : BORDER}`, background: "#fff" }}
+                                >
+                                  <option value="">PC used...</option>
+                                  {pcs.map((w) => (
+                                    <option key={w.workstationId} value={w.workstationId}
+                                      disabled={usedPcs.has(w.workstationId) && picked[r.studentId] !== w.workstationId}>
+                                      {w.seatLabel} ({w.pcIdentifier})
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-              <input value={note} onChange={(e) => setNote(e.target.value)}
-                placeholder="Reason for all of these, e.g. Server and Master PC were down; from the paper sheet"
-                className="w-full rounded-md px-3 py-2 text-[12.5px] outline-none" style={{ border: `1px solid ${BORDER}` }} />
+                <input aria-label="Reason for paper attendance" value={note} onChange={(e) => setNote(e.target.value)}
+                  placeholder="Reason for all of these, e.g. Server and Master PC were down; from the paper sheet"
+                  className="w-full rounded-md px-3 py-2 text-[12.5px] outline-none" style={{ border: `1px solid ${BORDER}` }} />
 
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[12px]" style={{ color: MUTED }}>
-                  {ticked.length} ticked{ticked.length !== ready.length ? ` · ${ticked.length - ready.length} still need a PC` : ""}
-                </span>
-                <button type="button" disabled={!canSave}
-                  onClick={() => {
-                    onSubmit(ready.map((id) => ({
-                      studentId: id,
-                      name: rows.find((r) => r.studentId === id)?.name ?? id,
-                      workstationId: Number(picked[id]),
-                    })), note.trim());
-                    setPicked({});
-                  }}
-                  className="rounded-md px-4 py-2 text-[12.5px] font-semibold"
-                  style={{ background: MAROON, color: GOLD, opacity: canSave ? 1 : 0.6 }}>
-                  {busy ? "Saving..." : `Record ${ready.length || ""} as present`}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[12px]" style={{ color: MUTED }}>
+                    {ticked.length} ticked{ticked.length !== ready.length ? ` · ${ticked.length - ready.length} still need a PC` : ""}
+                  </span>
+                  <button type="button" disabled={!canSave}
+                    onClick={() => {
+                      onSubmit(ready.map((id) => ({
+                        studentId: id,
+                        name: rows.find((r) => r.studentId === id)?.name ?? id,
+                        workstationId: Number(picked[id]),
+                      })), note.trim());
+                      setPicked({});
+                    }}
+                    className="rounded-md px-4 py-2 text-[12.5px] font-semibold"
+                    style={{ background: MAROON, color: GOLD, opacity: canSave ? 1 : 0.6 }}>
+                    {busy ? "Saving..." : `Record ${ready.length || ""} as present`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </fieldset>
       )}
-    </div>
+    </section>
   );
 }
 
 /** Absent students, each with a "Mark present" action for sessions the PC Agent could not record. */
-function AbsentList({ rows, pcs, onMarkPresent }: {
+function AbsentList({ rows, pcs, busy, pcMessage, onMarkPresent }: {
   rows: AbsentRow[];
   pcs: WorkstationEntry[];
+  busy: boolean;
+  pcMessage: string;
   onMarkPresent: (studentId: string, workstationId: number, note: string) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [pcId, setPcId] = useState<number | "">("");
   const [note, setNote] = useState("");
 
-  if (rows.length === 0) return null;
+  if (rows.length === 0) return <p className="confirm-empty-list">No students in this view.</p>;
 
   const open = (studentId: string) => { setOpenId(studentId); setPcId(""); setNote(""); };
 
   return (
     <div>
       <div className="text-[11.5px] font-semibold" style={{ color: "#b42318" }}>Absent ({rows.length})</div>
-      <div className="mt-1 max-h-56 space-y-1 overflow-auto pr-1">
+      <div className="confirm-student-list">
         {rows.map((r) => (
           <div key={r.studentId}>
-            <div className="flex items-center justify-between text-[12px]">
+            <div className="confirm-student-row">
               <span>{r.name}</span>
               <span className="flex items-center gap-2">
                 <span className="font-mono" style={{ color: MUTED }}>{r.schoolId}</span>
-                <button type="button" onClick={() => (openId === r.studentId ? setOpenId(null) : open(r.studentId))}
+                <button type="button" disabled={busy} aria-expanded={openId === r.studentId} onClick={() => (openId === r.studentId ? setOpenId(null) : open(r.studentId))}
                   className="rounded px-1.5 py-0.5 text-[11px]" style={{ border: `1px solid ${BORDER}`, color: MAROON }}>
                   {openId === r.studentId ? "Cancel" : "Mark present"}
                 </button>
               </span>
             </div>
             {openId === r.studentId && (
-              <div className="mt-1.5 space-y-1.5 rounded-md p-2" style={{ background: "#f6f8fa", border: `1px solid ${BORDER}` }}>
+              <fieldset disabled={busy} className="mt-1.5 space-y-1.5 rounded-md p-2" style={{ background: "#f6f8fa", border: `1px solid ${BORDER}` }}>
                 {pcs.length === 0 ? (
                   <div className="text-[11.5px]" style={{ color: MUTED }}>
-                    This class has no laboratory meeting on this day of the week, so there is no PC to record.
+                    {pcMessage || "No active workstations are available for this session."}
                   </div>
                 ) : (
                   <>
-                    <select value={pcId} onChange={(e) => setPcId(e.target.value ? Number(e.target.value) : "")}
+                    <select aria-label={`Workstation for ${r.name}`} value={pcId} onChange={(e) => setPcId(e.target.value ? Number(e.target.value) : "")}
                       className="w-full rounded px-2 py-1 text-[12px] outline-none" style={{ border: `1px solid ${BORDER}`, background: "#fff" }}>
                       <option value="">PC the student used...</option>
                       {pcs.map((w) => <option key={w.workstationId} value={w.workstationId}>{w.seatLabel} ({w.pcIdentifier})</option>)}
                     </select>
-                    <input value={note} onChange={(e) => setNote(e.target.value)}
+                    <input aria-label={`Reason for ${r.name}`} value={note} onChange={(e) => setNote(e.target.value)}
                       placeholder="Reason, e.g. Server and Master PC were down; from the paper sheet"
                       className="w-full rounded px-2 py-1 text-[12px] outline-none" style={{ border: `1px solid ${BORDER}` }} />
                     <button type="button" disabled={!pcId || note.trim().length < 5}
@@ -608,7 +651,7 @@ function AbsentList({ rows, pcs, onMarkPresent }: {
                     </button>
                   </>
                 )}
-              </div>
+              </fieldset>
             )}
           </div>
         ))}
@@ -618,13 +661,13 @@ function AbsentList({ rows, pcs, onMarkPresent }: {
 }
 
 function NameList({ title, tone, rows }: { title: string; tone: string; rows: { key: string | number; left: string; right: string }[] }) {
-  if (rows.length === 0) return null;
+  if (rows.length === 0) return <p className="confirm-empty-list">No students in this view.</p>;
   return (
     <div>
       <div className="text-[11.5px] font-semibold" style={{ color: tone }}>{title} ({rows.length})</div>
-      <div className="mt-1 max-h-56 space-y-1 overflow-auto pr-1">
+      <div className="confirm-student-list">
         {rows.map((r) => (
-          <div key={r.key} className="flex items-center justify-between text-[12px]">
+          <div key={r.key} className="confirm-student-row">
             <span>{r.left}</span>
             <span className="font-mono" style={{ color: MUTED }}>{r.right}</span>
           </div>
@@ -649,10 +692,8 @@ function PrimaryButton({ children, onClick, disabled }: { children: React.ReactN
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="mb-1 block text-[12.5px] font-medium" style={{ color: "#0d1117" }}>{label}</label>
-      {children}
-    </div>
+    <label className="confirm-field">
+      <span>{label}</span>{children}</label>
   );
 }
 

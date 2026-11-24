@@ -1,0 +1,53 @@
+[data-sonner-toaster].lab-snackbar-host {
+  --width: min(400px, calc(100vw - 32px));
+  font-family: inherit;
+}
+
+[data-sonner-toaster].lab-snackbar-host [data-sonner-toast].lab-snackbar {
+  width: var(--width);
+  min-height: 54px;
+  padding: 15px 46px 15px 17px;
+  gap: 12px;
+  border: 1px solid #51413d;
+  border-radius: 10px;
+  background: #302724;
+  color: #fffaf7;
+  box-shadow: 0 8px 30px #29181333;
+  font-size: 14px;
+  line-height: 1.55;
+  align-items: center;
+}
+
+.lab-snackbar-host .lab-snackbar .lab-snackbar-title { color: #fffaf7; font-size: 14px; font-weight: 500; line-height: 1.55; overflow-wrap: anywhere; }
+.lab-snackbar-host .lab-snackbar .lab-snackbar-description { color: #eadfd8; font-size: 13px; line-height: 1.55; }
+.lab-snackbar-host .lab-snackbar [data-icon] { width: 20px; height: 20px; flex-shrink: 0; margin: 0; }
+.lab-snackbar-host .lab-snackbar[data-type="success"] [data-icon] { color: #a9dfb8; }
+.lab-snackbar-host .lab-snackbar[data-type="error"] [data-icon] { color: #ffb8af; }
+.lab-snackbar-host .lab-snackbar[data-type="warning"] [data-icon] { color: #f5d071; }
+.lab-snackbar-host .lab-snackbar[data-type="info"] [data-icon] { color: #bbd8ff; }
+
+[data-sonner-toaster].lab-snackbar-host .lab-snackbar .lab-snackbar-close {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  left: auto;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 5px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #f5e8e1;
+  cursor: pointer;
+}
+[data-sonner-toaster].lab-snackbar-host .lab-snackbar .lab-snackbar-close:hover { background: #ffffff1a; color: #fff; }
+.lab-snackbar-host .lab-snackbar .lab-snackbar-action,
+.lab-snackbar-host .lab-snackbar .lab-snackbar-cancel { min-height: 30px; padding: 5px 9px; border: 0; border-radius: 5px; background: transparent; color: #f5d071; font: inherit; font-weight: 600; cursor: pointer; }
+.lab-snackbar-host .lab-snackbar :is(button, a):focus-visible { outline: 2px solid #f5d071; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toaster].lab-snackbar-host,
+  [data-sonner-toaster].lab-snackbar-host [data-sonner-toast] { animation: none !important; transition: none !important; }
+}
+@media print { [data-sonner-toaster].lab-snackbar-host { display: none !important; } }

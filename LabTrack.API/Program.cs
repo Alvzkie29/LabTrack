@@ -1,3 +1,4 @@
+using LabTrack.Api.Hubs;
 using System.Text;
 using LabTrack.Api.Data;
 using LabTrack.Api.Models;
@@ -77,6 +78,7 @@ builder.Services.AddHostedService<ReminderScheduler>();
 
 // ---- SignalR ----
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<StaffPresence>();
 
 // ---- CORS ----
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
@@ -157,6 +159,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<PresenceHub>("/hubs/presence", options => options.CloseOnAuthenticationExpiration = true);
 
 // Any other address (e.g. /dashboard after a refresh) loads the dashboard, which shows the right page.
 // Unknown /api addresses still answer 404 instead of returning the dashboard.

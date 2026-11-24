@@ -1,260 +1,357 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Search } from "lucide-react";
-import { getCourseSections, updateSectionFaculty, type CourseSectionSummary, type Meeting } from "@/api/courseSections";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { BookOpenText, CalendarDays, CircleAlert, RefreshCw, Search, Upload, UserRoundX, X } from "lucide-react";
+import { getCourseSections, updateSectionFaculty, type CourseSectionSummary } from "@/api/courseSections";
 import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
 import { getFacultyOptions, type FacultyOption } from "@/api/sessionConfirmations";
-import { useRole } from "@/contexts/RoleContext";
+import { getAcademicYears, semesterName, type AcademicYear } from "@/api/academicYears";
+import { useRole, canAccess } from "@/contexts/RoleContext";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { conflictsByMeeting, filterSections, findConflicts } from "./schedule/scheduleUtils";
+import { SectionDirectory } from "./schedule/SectionDirectory";
+import { SectionDetails, type SaveStatus } from "./schedule/SectionDetails";
+import type { OptionsState } from "./schedule/FacultyPicker";
+import "./schedule.css";
 
-const MUTED = "#57606a";
-const BORDER = "#d1d9e0";
-const MAROON = "#800000";
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+type LoadState = "loading" | "ready" | "error";
 
-const timeLabel = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
-};
-
-const inWeekOrder = (meetings: Meeting[]) =>
-  [...meetings].sort((a, b) => DAYS.indexOf(a.dayOfWeek) - DAYS.indexOf(b.dayOfWeek) || a.startTime.localeCompare(b.startTime));
-
-/**
- * One line per distinct time slot. A class that meets Mon in CL2 and Thu in CL1 at the same
- * time reads "Mon, Thu · 7:30 – 9:30 PM · CL2, CL1": days and labs are in the same order.
- */
-function meetingLines(meetings: Meeting[]) {
-  const bySlot = new Map<string, Meeting[]>();
-  for (const m of inWeekOrder(meetings)) {
-    const slot = `${m.startTime}-${m.endTime}`;
-    bySlot.set(slot, [...(bySlot.get(slot) ?? []), m]);
-  }
-  return [...bySlot.values()].map((group) => {
-    const labs = group.map((m) => m.laboratory.roomCode);
-    const sameLab = labs.every((l) => l === labs[0]);
-    return {
-      days: group.map((m) => m.dayOfWeek.slice(0, 3)).join(", "),
-      time: `${timeLabel(group[0].startTime)} – ${timeLabel(group[0].endTime)}`,
-      labs: sameLab ? labs[0] : labs.join(", "),
-    };
-  });
+function useMedia(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [query]);
+  return matches;
 }
 
 export function SchedulePage() {
   const { role } = useRole();
   const canAssign = role === "Custodian" || role === "Administrator";
+  const canImport = canAccess(role, "/imports");
+  const narrow = useMedia("(max-width: 899px)");
 
-  const [sections, setSections] = useState<CourseSectionSummary[]>([]);
-  const [labs, setLabs] = useState<LaboratorySummary[]>([]);
-  const [faculty, setFaculty] = useState<FacultyOption[]>([]);
-  const [labFilter, setLabFilter] = useState<number | "all">("all");
-  const [search, setSearch] = useState("");
-  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const load = () => getCourseSections().then(setSections).finally(() => setIsLoading(false));
+  /* ── Academic period ─────────────────────────────────── */
+  const [years, setYears] = useState<AcademicYear[]>([]);
+  const [yearsState, setYearsState] = useState<LoadState>("loading");
+  // undefined = not decided yet; null = semester list unavailable, so use the API's default (active) semester.
+  const [ayId, setAyId] = useState<number | null | undefined>(undefined);
+  const ayIdRef = useRef(ayId);
+  ayIdRef.current = ayId;
 
   useEffect(() => {
-    load().catch(() => setSections([]));
+    getAcademicYears()
+      .then((ys) => {
+        setYears(ys);
+        setYearsState("ready");
+        setAyId((ys.find((y) => y.isActive) ?? ys[0])?.ayId ?? null);
+      })
+      .catch(() => {
+        setYearsState("error");
+        setAyId(null);
+      });
+  }, []);
+
+  /* ── Course sections (one period at a time) ──────────── */
+  const [sections, setSections] = useState<CourseSectionSummary[]>([]);
+  const [sectionsState, setSectionsState] = useState<LoadState>("loading");
+  const [reloadKey, setReloadKey] = useState(0);
+  const requestId = useRef(0);
+  const fetchSections = useCallback(
+    (id: number | null | undefined) => (id == null ? getCourseSections() : getCourseSections({ ayId: id })),
+    [],
+  );
+
+  useEffect(() => {
+    if (ayId === undefined) return;
+    const req = ++requestId.current;
+    setSections([]); // never show one semester's sections under another's label
+    setSectionsState("loading");
+    fetchSections(ayId)
+      .then((rows) => {
+        if (req !== requestId.current) return;
+        setSections(rows);
+        setSectionsState("ready");
+      })
+      .catch(() => {
+        if (req === requestId.current) setSectionsState("error");
+      });
+  }, [ayId, reloadKey, fetchSections]);
+
+  /* ── Labs + faculty options ──────────────────────────── */
+  const [labs, setLabs] = useState<LaboratorySummary[]>([]);
+  useEffect(() => {
     getLaboratories().then(setLabs).catch(() => setLabs([]));
-    if (canAssign) getFacultyOptions().then(setFaculty).catch(() => setFaculty([]));
-  }, [canAssign]);
+  }, []);
 
-  // One row per class code.
-  const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return sections
-      .filter((s) => labFilter === "all" || s.meetings.some((m) => m.laboratory.labId === labFilter))
-      .filter((s) => !onlyUnassigned || !s.facultyId)
-      .filter((s) =>
-        !q ||
-        s.sectionCode.toLowerCase().includes(q) ||
-        s.subject.code.toLowerCase().includes(q) ||
-        s.subject.title.toLowerCase().includes(q) ||
-        (s.faculty ?? "").toLowerCase().includes(q))
-      .sort((a, b) => a.sectionCode.localeCompare(b.sectionCode, undefined, { numeric: true }));
-  }, [sections, labFilter, search, onlyUnassigned]);
+  const [faculty, setFaculty] = useState<FacultyOption[]>([]);
+  const [facultyState, setFacultyState] = useState<OptionsState>("loading");
+  const [facultyKey, setFacultyKey] = useState(0);
+  useEffect(() => {
+    if (!canAssign) return;
+    setFacultyState("loading");
+    getFacultyOptions()
+      .then((f) => { setFaculty(f); setFacultyState("ready"); })
+      .catch(() => setFacultyState("error"));
+  }, [canAssign, facultyKey]);
 
-  const unassignedCount = sections.filter((s) => !s.facultyId).length;
+  /* ── Filters ─────────────────────────────────────────── */
+  const [search, setSearch] = useState("");
+  const [labFilter, setLabFilter] = useState<number | "all">("all");
+  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
+  // A section just saved stays listed even if it no longer matches "No faculty yet", until filters change.
+  const [stickyId, setStickyId] = useState<number | null>(null);
+  useEffect(() => setStickyId(null), [search, labFilter, onlyUnassigned, ayId]);
 
-  const assign = async (sectionId: number, facultyId: string | null) => {
-    setError(null);
+  const filtered = useMemo(() => {
+    const rows = filterSections(sections, { search, labId: labFilter, onlyUnassigned });
+    if (stickyId === null || rows.some((s) => s.sectionId === stickyId)) return rows;
+    const sticky = sections.find((s) => s.sectionId === stickyId);
+    return sticky ? filterSections([...rows, sticky], { search: "", labId: "all", onlyUnassigned: false }) : rows;
+  }, [sections, search, labFilter, onlyUnassigned, stickyId]);
+
+  const unassignedCount = useMemo(() => sections.filter((s) => !s.facultyId).length, [sections]);
+  const conflictMap = useMemo(() => conflictsByMeeting(findConflicts(sections)), [sections]);
+  const labCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const s of sections) for (const id of new Set(s.meetings.map((m) => m.laboratory?.labId))) if (id != null) map.set(id, (map.get(id) ?? 0) + 1);
+    return map;
+  }, [sections]);
+
+  /* ── Selection ───────────────────────────────────────── */
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selected = selectedId === null ? null : filtered.find((s) => s.sectionId === selectedId) ?? null;
+  // If filters hide the selected section, drop the selection instead of showing stale details.
+  useEffect(() => {
+    if (selectedId !== null && sectionsState === "ready" && !filtered.some((s) => s.sectionId === selectedId)) setSelectedId(null);
+  }, [filtered, selectedId, sectionsState]);
+
+  /* ── Faculty drafts + saving ─────────────────────────── */
+  const [drafts, setDrafts] = useState<Record<number, string | null>>({});
+  const [saving, setSaving] = useState<Set<number>>(new Set());
+  const savingRef = useRef<Set<number>>(new Set());
+  const [status, setStatus] = useState<Record<number, SaveStatus>>({});
+  const timers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
+
+  useEffect(() => {
+    // New semester: start clean.
+    setSelectedId(null);
+    setDrafts({});
+    setStatus({});
+  }, [ayId]);
+
+  const setRowStatus = (id: number, value: SaveStatus | null, clearAfter?: number) => {
+    clearTimeout(timers.current[id]);
+    setStatus((prev) => {
+      const next = { ...prev };
+      if (value) next[id] = value;
+      else delete next[id];
+      return next;
+    });
+    if (value && clearAfter) timers.current[id] = setTimeout(() => setRowStatus(id, null), clearAfter);
+  };
+
+  const setDraft = (id: number, facultyId: string | null) => {
+    const saved = sections.find((s) => s.sectionId === id)?.facultyId ?? null;
+    setDrafts((prev) => {
+      const next = { ...prev };
+      if (facultyId === saved) delete next[id];
+      else next[id] = facultyId;
+      return next;
+    });
+    setRowStatus(id, null);
+  };
+
+  const revert = (id: number) => {
+    setDrafts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setRowStatus(id, null);
+  };
+
+  const save = async (id: number) => {
+    if (!(id in drafts) || savingRef.current.has(id)) return; // nothing to save, or already saving
+    const facultyId = drafts[id];
+    savingRef.current.add(id);
+    setSaving(new Set(savingRef.current));
+    setRowStatus(id, null);
     try {
-      await updateSectionFaculty(sectionId, facultyId);
-      await load();
+      await updateSectionFaculty(id, facultyId);
+      // Confirmed by the server: show it, keep the section selected and listed, then reconcile.
+      const picked = faculty.find((f) => f.id === facultyId);
+      setSections((prev) => prev.map((s) => (s.sectionId === id ? { ...s, facultyId, faculty: facultyId ? picked?.fullName ?? s.faculty : null } : s)));
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setStickyId(id);
+      setRowStatus(id, null);
+      snackbar.success(`Faculty assignment saved for section ${sections.find((section) => section.sectionId === id)?.sectionCode ?? id}.`);
+      const req = ++requestId.current;
+      fetchSections(ayIdRef.current)
+        .then((rows) => {
+          if (req !== requestId.current) return;
+          setSections(rows);
+          setSectionsState("ready");
+        })
+        .catch(() => {
+          if (req === requestId.current) setSectionsState("ready"); // keep the confirmed value already shown
+        });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not update the Faculty.");
+      snackbar.error(e instanceof ApiError ? e.message : "The server did not accept the faculty change.");
+      setRowStatus(id, { kind: "error", message: e instanceof ApiError ? e.message : "The server did not accept the change." });
+    } finally {
+      savingRef.current.delete(id);
+      setSaving(new Set(savingRef.current));
     }
   };
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <div className="font-mono text-[11px] uppercase tracking-wider" style={{ color: MUTED }}>
-          Imported from the Custodian's lab schedule · {sections.length} classes
-        </div>
-        <h1 className="mt-1" style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4 }}>Schedule</h1>
-        <p className="mt-0.5 text-[13px]" style={{ color: MUTED }}>
-          LabTrack does not generate or edit the schedule. It shows the imported lab meetings and checks attendance against them.
-          {canAssign && " Faculty are assigned here."}
-        </p>
+  /* ── Labels ──────────────────────────────────────────── */
+  const ay = years.find((y) => y.ayId === ayId);
+  const periodLabel = ay ? semesterName(ay) : yearsState === "loading" ? "Loading semester…" : "Current semester";
+  const hasFilters = search.trim() !== "" || labFilter !== "all" || onlyUnassigned;
+  const clearFilters = () => { setSearch(""); setLabFilter("all"); setOnlyUnassigned(false); };
+  const unsavedIds = useMemo(() => new Set(Object.keys(drafts).map(Number)), [drafts]);
+
+  /* ── Panels ──────────────────────────────────────────── */
+  const directoryBody =
+    sectionsState === "error" ? (
+      <div className="sch-state" role="alert">
+        <CircleAlert size={26} />
+        <h3>Course sections could not be loaded</h3>
+        <p>This is a connection or server problem, not an empty schedule.</p>
+        <button type="button" onClick={() => setReloadKey((k) => k + 1)}>Try again</button>
       </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-1 rounded-md p-1" style={{ background: "#fff", border: `1px solid ${BORDER}` }}>
-          {([{ id: "all" as const, name: "All labs" }, ...labs.map((l) => ({ id: l.labId, name: l.roomCode }))]).map((l) => {
-            const on = labFilter === l.id;
-            return (
-              <button key={String(l.id)} type="button" onClick={() => setLabFilter(l.id)}
-                className="rounded-[4px] px-3 py-1 font-mono text-[12px]"
-                style={{ background: on ? "#0d1117" : "transparent", color: on ? "#fff" : MUTED }}>
-                {l.name}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5" style={{ background: "#fff", border: `1px solid ${BORDER}` }}>
-          <Search className="size-3.5" style={{ color: MUTED }} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Class code, subject or faculty"
-            className="w-56 text-[12.5px] outline-none" />
-        </div>
-
-        <label className="flex cursor-pointer items-center gap-1.5 text-[12.5px]" style={{ color: MUTED }}>
-          <input type="checkbox" checked={onlyUnassigned} onChange={(e) => setOnlyUnassigned(e.target.checked)} />
-          No faculty yet ({unassignedCount})
-        </label>
+    ) : sectionsState === "loading" ? (
+      <div className="sch-skeleton" role="status">
+        <span className="sr-only">Loading course sections</span>
+        {Array.from({ length: 6 }, (_, i) => <div key={i} aria-hidden="true"><span /><span /><span /></div>)}
       </div>
-
-      {error && <div className="text-[12.5px]" style={{ color: "#b42318" }}>{error}</div>}
-
-      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
-        <table className="w-full text-[12.5px]">
-          <thead>
-            <tr style={{ background: "#f6f8fa", color: MUTED }}>
-              {["Class", "Subject", "Days", "Time", "Lab", "Faculty"].map((h, i) => (
-                <th key={h} className={`py-2.5 text-left font-mono text-[10.5px] uppercase tracking-wider ${i === 0 ? "pl-4" : ""}`}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((s) => {
-              const lines = meetingLines(s.meetings);
-              return (
-                <tr key={s.sectionId} style={{ borderTop: "1px solid #e1e4e8" }}>
-                  <td className="py-2.5 pl-4 pr-3 align-top font-mono text-[12px]" style={{ color: MAROON, fontWeight: 600 }}>{s.sectionCode}</td>
-                  <td className="py-2.5 pr-3 align-top">
-                    <span className="font-mono text-[11.5px]">{s.subject.code}</span> {s.subject.title}
-                    {s.termPart && (
-                      <span className="ml-1.5 rounded-full px-1.5 py-px font-mono text-[10px]" style={{ background: "#f6f8fa", border: `1px solid ${BORDER}`, color: MUTED }}>
-                        {s.term}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2.5 pr-3 align-top">{lines.map((l, i) => <div key={i}>{l.days}</div>)}</td>
-                  <td className="whitespace-nowrap py-2.5 pr-3 align-top font-mono text-[11.5px]">{lines.map((l, i) => <div key={i}>{l.time}</div>)}</td>
-                  <td className="py-2.5 pr-3 align-top font-mono text-[11.5px]">{lines.map((l, i) => <div key={i}>{l.labs}</div>)}</td>
-                  <td className="py-2 pr-4 align-top">
-                    {canAssign ? (
-                      <FacultyPicker
-                        value={s.facultyId}
-                        label={s.faculty}
-                        options={faculty}
-                        onChange={(id) => assign(s.sectionId, id)}
-                      />
-                    ) : (
-                      <span style={{ color: s.faculty ? MUTED : MAROON }}>{s.faculty ?? "Unassigned"}</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={6} className="py-8 text-center text-[13px]" style={{ color: MUTED }}>
-                  {isLoading ? "Loading..." : sections.length === 0 ? "No lab meetings yet. Import the schedule first." : "No classes match these filters."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+    ) : sections.length === 0 ? (
+      <div className="sch-state">
+        <Upload size={26} />
+        <h3>No imported schedule</h3>
+        <p>No course sections have been imported for {periodLabel}. LabTrack does not create schedules; they come from the Custodian's import.</p>
+        {canImport && <Link to="/imports" className="sch-state-link">Go to Imports</Link>}
       </div>
+    ) : filtered.length === 0 ? (
+      <div className="sch-state">
+        <Search size={24} />
+        <h3>{onlyUnassigned && unassignedCount === 0 ? "Every section has a faculty" : "No matching sections"}</h3>
+        <p>{onlyUnassigned && unassignedCount === 0 ? "No section in this semester is waiting for a faculty assignment." : "Try another section code, subject, faculty name, or laboratory."}</p>
+        <button type="button" onClick={clearFilters}>Clear filters</button>
+      </div>
+    ) : (
+      <SectionDirectory sections={filtered} selectedId={selectedId} labFilter={labFilter} unsavedIds={unsavedIds} onSelect={setSelectedId} />
+    );
+
+  const details = selected ? (
+    <SectionDetails
+      key={selected.sectionId}
+      section={selected}
+      periodLabel={periodLabel}
+      labs={labs}
+      labFilter={labFilter}
+      conflictMap={conflictMap}
+      canAssign={canAssign}
+      faculty={faculty}
+      facultyState={facultyState}
+      draft={selected.sectionId in drafts ? drafts[selected.sectionId] : undefined}
+      saving={saving.has(selected.sectionId)}
+      status={status[selected.sectionId]}
+      onDraft={(id) => setDraft(selected.sectionId, id)}
+      onSave={() => void save(selected.sectionId)}
+      onRevert={() => revert(selected.sectionId)}
+      onRetryOptions={() => setFacultyKey((k) => k + 1)}
+      onBack={narrow ? () => setSelectedId(null) : undefined}
+    />
+  ) : (
+    <div className="sch-empty-select">
+      <span><BookOpenText size={22} /></span>
+      <h3>Select a course section</h3>
+      <p>Choose a section from the left to view its imported schedule and faculty assignment.</p>
     </div>
   );
-}
 
-/** A dropdown with a search box: type part of a name instead of scrolling the whole faculty list. */
-function FacultyPicker({ value, label, options, onChange }: {
-  value: string | null;
-  label: string | null;
-  options: FacultyOption[];
-  onChange: (facultyId: string | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const box = useRef<HTMLDivElement>(null);
-  const input = useRef<HTMLInputElement>(null);
-
-  // Close when clicking elsewhere or pressing Escape.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    input.current?.focus();
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const q = query.trim().toLowerCase();
-  const matches = options.filter((f) => !q || f.fullName.toLowerCase().includes(q) || f.schoolId.toLowerCase().includes(q));
-
-  const pick = (id: string | null) => {
-    setOpen(false);
-    setQuery("");
-    if (id !== value) onChange(id);
-  };
+  const showDetailsOnly = narrow && selected !== null;
 
   return (
-    <div ref={box} className="relative inline-block w-56">
-      <button type="button" onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-[12px]"
-        style={{ border: `1px solid ${BORDER}`, background: "#fff", color: value ? "#0d1117" : MAROON }}>
-        <span className="truncate">{label ?? "Unassigned"}</span>
-        <ChevronDown className="size-3.5 shrink-0" style={{ color: MUTED }} />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 z-20 mt-1 w-64 rounded-md shadow-lg" style={{ background: "#fff", border: `1px solid ${BORDER}` }}>
-          <div className="flex items-center gap-1.5 px-2.5 py-2" style={{ borderBottom: "1px solid #e1e4e8" }}>
-            <Search className="size-3.5" style={{ color: MUTED }} />
-            <input ref={input} value={query} onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && matches.length === 1) pick(matches[0].id); }}
-              placeholder="Search faculty..." className="w-full text-[12.5px] outline-none" />
-          </div>
-          <div className="max-h-56 overflow-auto py-1">
-            <button type="button" onClick={() => pick(null)}
-              className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[#f6f8fa]" style={{ color: MAROON }}>
-              Unassigned
-            </button>
-            {matches.map((f) => (
-              <button key={f.id} type="button" onClick={() => pick(f.id)}
-                className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[#f6f8fa]"
-                style={{ background: f.id === value ? "#fbeeee" : undefined }}>
-                <span className="truncate">{f.fullName}</span>
-                <span className="shrink-0 font-mono text-[10.5px]" style={{ color: MUTED }}>{f.schoolId}</span>
-              </button>
-            ))}
-            {matches.length === 0 && (
-              <div className="px-3 py-2 text-[12px]" style={{ color: MUTED }}>No faculty match "{query}".</div>
-            )}
-          </div>
+    <div className="sch-page">
+      <header className="sch-heading">
+        <div>
+          <p className="sch-eyebrow">ACADEMIC MANAGEMENT / LABORATORY SCHEDULE</p>
+          <h1>
+            Schedule
+            {sectionsState === "ready" && <span className="sch-count">· {sections.length} Course {sections.length === 1 ? "Section" : "Sections"}</span>}
+          </h1>
+          <p>Review imported laboratory schedules and manage faculty assignments.</p>
         </div>
-      )}
+        <button className="sch-refresh" onClick={() => setReloadKey((k) => k + 1)} disabled={sectionsState === "loading" || ayId === undefined}>
+          <RefreshCw size={14} className={sectionsState === "loading" ? "sch-spin" : ""} /> Refresh
+        </button>
+      </header>
+
+      <div className="sch-split">
+        {!showDetailsOnly && (
+          <section className="sch-dir" aria-label="Course section directory">
+            <div className="sch-dir-tools">
+              {yearsState === "ready" && years.length > 0 ? (
+                <SearchableSelect
+                  ariaLabel="Academic period"
+                  value={ayId == null ? "" : String(ayId)}
+                  onValueChange={(v: string) => setAyId(v ? Number(v) : null)}
+                  options={years.map((y) => ({ value: String(y.ayId), label: `${semesterName(y)}${y.isActive ? " (active)" : ""}` }))}
+                  leadingIcon={<CalendarDays size={15} />}
+                  searchPlaceholder="Search semesters…"
+                />
+              ) : (
+                <span className="sch-period-text"><CalendarDays size={14} /> {periodLabel}</span>
+              )}
+
+              <label className="sch-search">
+                <Search size={15} />
+                <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Section, subject or faculty…" aria-label="Search course sections" />
+                {search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")}><X size={13} /></button>}
+              </label>
+
+              <div className="sch-labs" role="group" aria-label="Laboratory">
+                <button type="button" className={labFilter === "all" ? "is-active" : ""} aria-pressed={labFilter === "all"} onClick={() => setLabFilter("all")}>
+                  All labs
+                </button>
+                {labs.map((l) => (
+                  <button key={l.labId} type="button" className={labFilter === l.labId ? "is-active" : ""} aria-pressed={labFilter === l.labId} onClick={() => setLabFilter(l.labId)} title={l.name}>
+                    {l.roomCode} <span>{labCounts.get(l.labId) ?? 0}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="sch-dir-sub">
+                <button type="button" className={`sch-toggle ${onlyUnassigned ? "is-on" : ""}`} aria-pressed={onlyUnassigned} onClick={() => setOnlyUnassigned((v) => !v)}>
+                  <UserRoundX size={13} /> No faculty yet <span>{sectionsState === "ready" ? unassignedCount : "–"}</span>
+                </button>
+                <span className="sch-dir-count-label" role="status">
+                  {sectionsState === "ready" ? `${filtered.length} of ${sections.length}` : ""}
+                  {hasFilters && <button type="button" onClick={clearFilters}>Clear</button>}
+                </span>
+              </div>
+            </div>
+            {directoryBody}
+          </section>
+        )}
+
+        {(!narrow || showDetailsOnly) && (
+          <section className="sch-panel" aria-label="Selected course section">
+            {details}
+          </section>
+        )}
+      </div>
     </div>
   );
 }

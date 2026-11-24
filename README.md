@@ -113,9 +113,7 @@ Enter a School ID below in the agent's **Student ID** field, followed by its pas
 
 These initial credentials are defined in `LabTrack/LabTrack.API/Data/DbSeeder.cs`. The student, custodian, and assistant accounts are created when the API runs in **Development**; only the administrator is seeded outside Development. Seeding does not reset existing passwords.
 
-Student login suggests a session from the student's imported class list that is scheduled in this workstation's laboratory today and currently open for attendance. The dropdown shows only that student's assigned classes in this lab today; unassigned classes are hidden. The window opens 15 minutes before the scheduled start and closes at the end time (Philippine time). Assigned sessions outside that window are disabled and marked with a reason such as "Not time for this session yet" or "This session has ended." The API independently enforces enrollment, laboratory, day, active semester, and time before recording attendance. Staff login unlocks the PC for maintenance and records an audit entry without recording attendance. Faculty accounts cannot log in through the PC agent.
-
-The seeded demo student is **not automatically enrolled** in a section. In the staff dashboard, import the student's class list into the appropriate course section before testing student attendance. Having valid login credentials alone does not grant access to every laboratory session.
+Student login lets you select and confirm a class scheduled in the workstation's laboratory today to record attendance. Staff login unlocks the PC for maintenance and records an audit entry without recording attendance. Faculty accounts cannot log in through the PC agent.
 
 Keep the API running and configure a workstation that exists in the database. Change these development passwords before shared use.
 
@@ -147,13 +145,11 @@ Unlike the browser setting, the agent base URL **includes `/api`**. Match the wo
 
 For a lab demo, set `"LockEnabled": true` in `LabTrackPCAgent/bin/Debug/net10.0-windows/win-x64/agent.config.json`, then run the agent. Start the API first and verify the workstation is registered. This setting applies to the executable in that output folder.
 
-Lock mode opens a borderless, full-screen login window with no close button and blocks common exit shortcuts. Enroll the demo student in a section first, then sign in as `2026-0001` with `Student@123` during that section's laboratory attendance window and confirm the assigned session to access the desktop. Accounts marked as requiring a new password must change it first. Staff can sign in as `ADMIN-0001` with `Admin@12345` to unlock for maintenance without attendance. Use current passwords if these accounts have been changed. Restart both API and agent after updating the assigned-session logic; the agent blocks confirmation when eligibility information is missing from an older API.
+Lock mode opens a borderless, full-screen login window with no close button and blocks common exit shortcuts. Sign in as student `2026-0001` with `Student@123`, select a class available today, and confirm attendance to access the desktop. Accounts marked as requiring a new password must change it first. Staff can sign in as `ADMIN-0001` with `Admin@12345` to unlock for maintenance without attendance. Use current passwords if these accounts have been changed.
 
-The thin session bar can be dragged by its logo or text. The up-arrow collapses the details into a small **Session** tab; its down-arrow expands them again. The **X** button (or Alt+F4) hides the bar in the Windows notification area without ending the session. Click the LabTrack tray icon to restore it, or right-click it for **Show session** and **End Session**. Windows may put this icon in the tray's **^** overflow panel. **End Session** asks for confirmation before returning the PC to the login lock screen and removing the session tray icon. For recovery if login is unavailable, use **Ctrl+Alt+Delete > Sign out**; this ends the Windows session and closes unsaved applications. To return to normal development mode, set `"LockEnabled": false` before the next agent launch. This setting does not install automatic startup at Windows sign-in.
+The session bar's up-arrow hides the details in a compact **Show session** tab; click that tab to expand it again. Hiding the details keeps the session active. **End Session** still asks for confirmation before returning the PC to the login lock screen. For recovery if login is unavailable, use **Ctrl+Alt+Delete > Sign out**; this ends the Windows session and closes unsaved applications. To return to normal development mode, set `"LockEnabled": false` before the next agent launch. This setting does not install automatic startup at Windows sign-in.
 
 Publish using `dotnet publish -c Release -r win-x64`. The project already enables self-contained, single-file deployment. Configure `agent.config.json` beside the published executable for each machine.
-
-Drag the session bar's logo near the left or right screen edge and release it to dock vertically. The dock shows the LabTrack logo, a power button for **End Session**, and **X** to hide to the tray; the user's name is hidden. Drag the logo away from the edge to restore the previous expanded or compact horizontal view. The power button uses the same confirmation before relocking the PC.
 
 ## Current web screens
 
@@ -242,5 +238,4 @@ Stop-Process -Name LabTrackAgent -Force -ErrorAction SilentlyContinue
 $policyPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\System'
 Remove-ItemProperty -Path $policyPath `    -Name DisableTaskMgr,DisableLockWorkstation,DisableChangePassword`
 -ErrorAction SilentlyContinue
-#   L a b t r a c k  
- 
+

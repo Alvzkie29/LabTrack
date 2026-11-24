@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { CalendarPlus, Check, FileText, Paperclip, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarPlus, CircleAlert, Eye, FileText, Search, Trash2, X } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
 import { getCourseSections, type CourseSectionSummary } from "@/api/courseSections";
 import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
@@ -7,292 +7,278 @@ import {
   createMakeUpClass, deleteMakeUpClass, getMakeUpClasses, openMakeUpAttachment, type MakeUpClass,
 } from "@/api/makeUpClasses";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
+import { MakeUpForm, type MakeUpPayload } from "./makeup/MakeUpForm";
+import { MakeUpDetails } from "./makeup/MakeUpDetails";
+import { SessionBadge } from "./makeup/SessionBadge";
+import { dateLabel, durationText, parseLocalDate, timeLabel } from "./makeup/timeSlots";
+import "./makeup-classes.css";
 
-const MAROON = "#800000";
-const GOLD = "#F4C430";
-const MUTED = "#57606a";
-const BORDER = "#d1d9e0";
-const INPUT = "w-full rounded-md bg-white px-2.5 py-1.5 text-[13px] outline-none";
+type SessionFilter = "all" | "none" | "progress" | "confirmed";
+const FILTERS: { value: SessionFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "none", label: "Not confirmed" },
+  { value: "progress", label: "In progress" },
+  { value: "confirmed", label: "Confirmed" },
+];
+const sessionKind = (m: MakeUpClass): SessionFilter => (m.session === "Confirmed" ? "confirmed" : m.session ? "progress" : "none");
 
-const timeLabel = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
-};
-const dateLabel = (iso: string) =>
-  new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-
-interface Form {
-  sectionId: number | "";
-  labId: number | "";
-  date: string;
-  startTime: string;
-  endTime: string;
-  reason: string;
-  file: File | null;
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-const EMPTY: Form = { sectionId: "", labId: "", date: "", startTime: "", endTime: "", reason: "", file: null };
 
 export function MakeUpClassesPage() {
   const { role } = useRole();
   const allowed = role === "Custodian" || role === "Administrator" || role === "LabAssistant";
 
   const [list, setList] = useState<MakeUpClass[]>([]);
+  const [listState, setListState] = useState<"loading" | "ready" | "error">("loading");
   const [sections, setSections] = useState<CourseSectionSummary[]>([]);
+  const [sectionsFailed, setSectionsFailed] = useState(false);
   const [labs, setLabs] = useState<LaboratorySummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState<Form | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
-  const load = () => getMakeUpClasses().then(setList).catch(() => setList([])).finally(() => setLoading(false));
+  const [showForm, setShowForm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false); // blocks a second submit before React re-renders
+  const [formError, setFormError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<MakeUpClass["makeUpId"] | null>(null);
+  const [opening, setOpening] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [sessionFilter, setSessionFilter] = useState<SessionFilter>("all");
+
+  const load = () =>
+    getMakeUpClasses()
+      .then((rows) => { setList(rows); setListState("ready"); })
+      .catch(() => setListState((s) => (s === "ready" ? "ready" : "error")));
 
   useEffect(() => {
     if (!allowed) return;
     load();
-    getCourseSections().then(setSections).catch(() => setSections([]));
+    getCourseSections().then((s) => { setSections(s); setSectionsFailed(false); }).catch(() => { setSections([]); setSectionsFailed(true); });
     getLaboratories().then(setLabs).catch(() => setLabs([]));
   }, [allowed]);
 
+  const counts = useMemo(() => {
+    const c: Record<SessionFilter, number> = { all: list.length, none: 0, progress: 0, confirmed: 0 };
+    for (const m of list) c[sessionKind(m)]++;
+    return c;
+  }, [list]);
+
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return list.filter((m) =>
+      (sessionFilter === "all" || sessionKind(m) === sessionFilter) &&
+      (!q || [m.sectionCode, m.subjectCode, m.subjectTitle, m.faculty ?? "", m.roomCode, m.reason ?? "", m.createdBy].some((v) => v.toLowerCase().includes(q))));
+  }, [list, search, sessionFilter]);
+
+  const selected = selectedId === null ? null : list.find((m) => m.makeUpId === selectedId) ?? null;
+
   if (!allowed) {
-    return <div className="py-24 text-center text-[13px]" style={{ color: MUTED }}>This page is only available to staff.</div>;
+    return <div className="py-24 text-center text-[13px]" style={{ color: "#57606a" }}>This page is only available to staff.</div>;
   }
 
-  const save = async () => {
-    if (!form || form.sectionId === "" || form.labId === "" || !form.file) return;
-    setBusy(true); setError(null); setMessage(null);
+  const openForm = () => { setShowForm(true); setFormError(null); };
+
+  const save = async (p: MakeUpPayload) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true); setFormError(null);
     try {
       await createMakeUpClass({
-        sectionId: form.sectionId, labId: form.labId, date: form.date,
-        startTime: form.startTime, endTime: form.endTime, reason: form.reason, attachment: form.file,
+        sectionId: p.sectionId, labId: p.labId, date: p.date,
+        startTime: p.startTime, endTime: p.endTime, reason: p.reason, attachment: p.attachment,
       });
-      const s = sections.find((x) => x.sectionId === form.sectionId);
-      setMessage(`Make-up class for ${s?.sectionCode ?? "the class"} on ${dateLabel(form.date)} saved. Students can log in for it on the PC Agent that day.`);
-      setForm(null);
+      const s = sections.find((x) => x.sectionId === p.sectionId);
+      snackbar.success(`Make-up class for ${s?.sectionCode ?? "the class"} on ${dateLabel(p.date)} saved. Students can log in for it on the PC Agent that day.`);
+      setShowForm(false);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not save the make-up class.");
+      // Keep the drawer open with everything filled in, so the user can fix and retry.
+      setFormError(e instanceof ApiError ? e.message : "Could not save the make-up class.");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
   const remove = async (m: MakeUpClass) => {
+    if (busyRef.current) return;
     if (!window.confirm(`Remove the make-up class for ${m.sectionCode} on ${dateLabel(m.date)}?`)) return;
-    setBusy(true); setError(null); setMessage(null);
+    busyRef.current = true;
+    setBusy(true);
     try {
       await deleteMakeUpClass(m.makeUpId);
-      setMessage("Make-up class removed.");
+      snackbar.success("Make-up class removed.");
+      setSelectedId(null);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not remove it.");
+      snackbar.error(e instanceof ApiError ? e.message : "Could not remove it.");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
-  const open = (m: MakeUpClass) =>
-    openMakeUpAttachment(m.makeUpId).catch((e) => setError(e instanceof ApiError ? e.message : "Could not open the attachment."));
-
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="font-mono text-[11px] uppercase tracking-wider" style={{ color: MUTED }}>Schedule</div>
-          <h1 className="mt-1" style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4 }}>Make-up Classes</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px]" style={{ color: MUTED }}>
-            Record an approved make-up class with the request attached. On that date it works like a regular lab
-            meeting: students log in on the PC Agent, the faculty confirms the session, and its hours count once finally confirmed.
-          </p>
-        </div>
-        {!form && (
-          <button type="button" onClick={() => { setForm(EMPTY); setError(null); setMessage(null); }}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium" style={{ background: MAROON, color: GOLD }}>
-            <CalendarPlus className="size-3.5" /> Add make-up class
-          </button>
-        )}
-      </div>
-
-      {message && <div className="text-[12.5px]" style={{ color: "#1a7f37" }}>{message}</div>}
-      {error && <div className="text-[12.5px]" style={{ color: "#b42318" }}>{error}</div>}
-
-      {form && (
-        <MakeUpForm form={form} sections={sections} labs={labs} busy={busy}
-          onChange={setForm} onSave={save} onCancel={() => { setForm(null); setError(null); }} />
-      )}
-
-      <div className="overflow-x-auto" style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
-        <table className="w-full text-[12.5px]">
-          <thead>
-            <tr style={{ background: "#f6f8fa", color: MUTED }}>
-              {["Date", "Time", "Class", "Lab", "Reason", "Approved request", "Session", ""].map((h, i) => (
-                <th key={i} className={`py-2.5 pr-3 text-left font-mono text-[10.5px] uppercase tracking-wider ${i === 0 ? "pl-4" : ""}`}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((m) => (
-              <tr key={m.makeUpId} style={{ borderTop: "1px solid #e1e4e8" }}>
-                <td className="whitespace-nowrap py-2.5 pl-4 pr-3 align-top">{dateLabel(m.date)}</td>
-                <td className="whitespace-nowrap py-2.5 pr-3 align-top font-mono text-[11.5px]">
-                  {timeLabel(m.startTime)} – {timeLabel(m.endTime)}
-                  <div style={{ color: MUTED }}>{m.hours}h</div>
-                </td>
-                <td className="py-2.5 pr-3 align-top">
-                  <span className="font-mono" style={{ color: MAROON, fontWeight: 600 }}>{m.sectionCode}</span>{" "}
-                  <span className="font-mono text-[11.5px]">{m.subjectCode}</span> {m.subjectTitle}
-                  <div style={{ color: MUTED }}>{m.faculty ?? "No faculty assigned"}</div>
-                </td>
-                <td className="py-2.5 pr-3 align-top font-mono text-[11.5px]">{m.roomCode}</td>
-                <td className="py-2.5 pr-3 align-top" style={{ color: m.reason ? undefined : MUTED }}>{m.reason ?? "—"}</td>
-                <td className="py-2.5 pr-3 align-top">
-                  <button type="button" onClick={() => open(m)} className="inline-flex max-w-[180px] items-center gap-1 text-left hover:underline" style={{ color: MAROON }}>
-                    <FileText className="size-3.5 shrink-0" /> <span className="truncate">{m.attachmentName}</span>
-                  </button>
-                  <div className="text-[11px]" style={{ color: MUTED }}>by {m.createdBy}</div>
-                </td>
-                <td className="py-2.5 pr-3 align-top">
-                  {m.session === "Confirmed" ? (
-                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: "#dafbe1", color: "#1a7f37" }}>
-                      <Check className="size-3" /> Confirmed
-                    </span>
-                  ) : m.session ? (
-                    <span className="text-[11.5px]" style={{ color: "#9a6700" }}>{m.session}</span>
-                  ) : (
-                    <span className="text-[11.5px]" style={{ color: MUTED }}>Not confirmed yet</span>
-                  )}
-                </td>
-                <td className="py-2.5 pr-4 text-right align-top">
-                  {!m.session && (
-                    <button type="button" title="Remove" disabled={busy} onClick={() => remove(m)}
-                      className="rounded p-1 hover:bg-[#fff4f4]" style={{ color: "#b42318" }}>
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {list.length === 0 && (
-              <tr>
-                <td colSpan={8} className="py-10 text-center text-[13px]" style={{ color: MUTED }}>
-                  {loading ? "Loading..." : "No make-up classes this semester."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function MakeUpForm({ form, sections, labs, busy, onChange, onSave, onCancel }: {
-  form: Form;
-  sections: CourseSectionSummary[];
-  labs: LaboratorySummary[];
-  busy: boolean;
-  onChange: (f: Form) => void;
-  onSave: () => void;
-  onCancel: () => void;
-}) {
-  const [query, setQuery] = useState("");
-  const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
-
-  const q = query.trim().toLowerCase();
-  const matches = useMemo(
-    () =>
-      [...sections]
-        .filter((s) => !q || s.sectionCode.toLowerCase().includes(q) || s.subject.code.toLowerCase().includes(q)
-          || s.subject.title.toLowerCase().includes(q) || (s.faculty ?? "").toLowerCase().includes(q))
-        .sort((a, b) => a.sectionCode.localeCompare(b.sectionCode, undefined, { numeric: true })),
-    [sections, q],
-  );
-
-  // Picking a class fills in its usual lab and time, which can then be changed.
-  const pickSection = (id: number | "") => {
-    const s = sections.find((x) => x.sectionId === id);
-    const m = s?.meetings[0];
-    set({
-      sectionId: id,
-      labId: m ? m.laboratory.labId : form.labId,
-      startTime: m ? m.startTime.slice(0, 5) : form.startTime,
-      endTime: m ? m.endTime.slice(0, 5) : form.endTime,
-    });
+  const openAttachment = (m: MakeUpClass) => {
+    setOpening(true);
+    openMakeUpAttachment(m.makeUpId)
+      .catch((e) => snackbar.error(e instanceof ApiError ? e.message : "Could not open the attachment."))
+      .finally(() => setOpening(false));
   };
 
-  const sunday = form.date !== "" && new Date(`${form.date}T00:00:00`).getDay() === 0;
-  const ready = form.sectionId !== "" && form.labId !== "" && form.date !== "" && !sunday
-    && form.startTime !== "" && form.endTime !== "" && form.endTime > form.startTime && form.file !== null;
+  const today = todayIso();
+  const hasFilters = search.trim() !== "" || sessionFilter !== "all";
 
   return (
-    <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 6, padding: 18 }}>
-      <div className="mb-3 text-[14px] font-semibold">New make-up class</div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Class">
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search class code, subject or faculty"
-            className={`${INPUT} mb-1.5`} style={{ border: `1px solid ${BORDER}` }} />
-          <select value={form.sectionId} onChange={(e) => pickSection(e.target.value ? Number(e.target.value) : "")}
-            className={INPUT} style={{ border: `1px solid ${BORDER}` }}>
-            <option value="">Select a class... ({matches.length})</option>
-            {matches.map((s) => (
-              <option key={s.sectionId} value={s.sectionId}>
-                {s.sectionCode} · {s.subject.code} {s.subject.title}{s.faculty ? ` · ${s.faculty}` : ""}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Date">
-            <input type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} className={INPUT} style={{ border: `1px solid ${BORDER}` }} />
-            {sunday && <span className="mt-1 block text-[11.5px]" style={{ color: "#b42318" }}>Make-up classes can be Monday to Saturday.</span>}
-          </Field>
-          <Field label="Laboratory">
-            <select value={form.labId} onChange={(e) => set({ labId: e.target.value ? Number(e.target.value) : "" })}
-              className={INPUT} style={{ border: `1px solid ${BORDER}` }}>
-              <option value="">Select...</option>
-              {labs.map((l) => <option key={l.labId} value={l.labId}>{l.roomCode} · {l.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Starts">
-            <input type="time" value={form.startTime} onChange={(e) => set({ startTime: e.target.value })} className={INPUT} style={{ border: `1px solid ${BORDER}` }} />
-          </Field>
-          <Field label="Ends">
-            <input type="time" value={form.endTime} onChange={(e) => set({ endTime: e.target.value })} className={INPUT} style={{ border: `1px solid ${BORDER}` }} />
-          </Field>
+    <div className="mk-page">
+      <header className="mk-heading">
+        <div>
+          <p className="mk-eyebrow">ACADEMIC MANAGEMENT / MAKE-UP SESSIONS</p>
+          <h1>Make-up Classes</h1>
+          <p>Manage approved make-up laboratory sessions, scheduled time slots, and supporting documents.</p>
         </div>
-        <Field label="Reason (optional)">
-          <input value={form.reason} maxLength={300} onChange={(e) => set({ reason: e.target.value })}
-            placeholder="e.g. Class missed on Nov 11 (holiday)" className={INPUT} style={{ border: `1px solid ${BORDER}` }} />
-        </Field>
-        <Field label="Approved request (PDF, JPG or PNG, up to 5 MB)">
-          <label className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12.5px]" style={{ border: `1px dashed ${BORDER}` }}>
-            <Paperclip className="size-3.5" style={{ color: MUTED }} />
-            <span className="truncate" style={{ color: form.file ? "#0d1117" : MUTED }}>{form.file ? form.file.name : "Choose the file..."}</span>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" className="hidden"
-              onChange={(e) => set({ file: e.target.files?.[0] ?? null })} />
-          </label>
-        </Field>
-      </div>
-      <div className="mt-4 flex gap-2">
-        <button type="button" onClick={onSave} disabled={!ready || busy}
-          className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium"
-          style={{ background: MAROON, color: GOLD, opacity: ready && !busy ? 1 : 0.6 }}>
-          <Check className="size-3.5" /> {busy ? "Saving..." : "Save"}
+        <button type="button" className="mk-btn is-primary is-lg" onClick={openForm}>
+          <CalendarPlus size={15} className="mk-gold" /> Add Make-up Class
         </button>
-        <button type="button" onClick={onCancel} className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px]"
-          style={{ border: `1px solid ${BORDER}`, color: MUTED }}>
-          <X className="size-3.5" /> Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
+      </header>
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block font-mono text-[10px] uppercase tracking-wider" style={{ color: MUTED }}>{label}</span>
-      {children}
-    </label>
+      <section className="mk-card">
+        {listState === "ready" && list.length > 0 && (
+          <div className="mk-toolbar">
+            <label className="mk-search">
+              <Search size={15} />
+              <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search class, subject, faculty, lab or reason…" aria-label="Search make-up classes" />
+              {search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")}><X size={13} /></button>}
+            </label>
+            <div className="mk-seg" role="group" aria-label="Session status">
+              {FILTERS.map((f) => (
+                <button key={f.value} type="button" aria-pressed={sessionFilter === f.value} className={sessionFilter === f.value ? "is-on" : ""} onClick={() => setSessionFilter(f.value)}>
+                  {f.label} <span>{counts[f.value]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {listState === "loading" ? (
+          <div className="mk-skeleton" role="status">
+            <span className="sr-only">Loading make-up classes</span>
+            {Array.from({ length: 5 }, (_, i) => <div key={i} aria-hidden="true"><span /><span /><span /><span /></div>)}
+          </div>
+        ) : listState === "error" ? (
+          <div className="mk-state" role="alert">
+            <CircleAlert size={28} />
+            <h3>Make-up classes could not be loaded</h3>
+            <p>This is a connection or server problem, not an empty list.</p>
+            <button type="button" className="mk-btn" onClick={() => { setListState("loading"); load(); }}>Try again</button>
+          </div>
+        ) : list.length === 0 ? (
+          <div className="mk-state">
+            <span className="mk-state-icon"><CalendarPlus size={24} /></span>
+            <h3>No make-up classes this semester</h3>
+            <p>When a make-up request is approved, record it here with the approved request attached. It then works like a regular lab meeting on that date.</p>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="mk-state">
+            <Search size={24} />
+            <h3>No matching make-up classes</h3>
+            <p>Try another class, subject, faculty, lab, or session status.</p>
+            {hasFilters && <button type="button" className="mk-btn" onClick={() => { setSearch(""); setSessionFilter("all"); }}>Clear filters</button>}
+          </div>
+        ) : (
+          <div className="mk-table-scroll">
+            <table className="mk-table">
+              <caption className="sr-only">Recorded make-up classes</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Time</th>
+                  <th scope="col">Class</th>
+                  <th scope="col">Lab</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col">Approved request</th>
+                  <th scope="col">Session</th>
+                  <th scope="col"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((m) => {
+                  const day = m.date.slice(0, 10);
+                  const when = day === today ? "Today" : parseLocalDate(day) > parseLocalDate(today) ? "Upcoming" : null;
+                  return (
+                    <tr key={m.makeUpId} className={selectedId === m.makeUpId ? "is-selected" : ""}
+                      onClick={(e) => { if (!(e.target as HTMLElement).closest("button,a")) setSelectedId(m.makeUpId); }}>
+                      <td>
+                        <span className="mk-date">{dateLabel(m.date)}</span>
+                        {when && <span className={`mk-when ${when === "Today" ? "is-today" : ""}`}>{when}</span>}
+                      </td>
+                      <td>
+                        <span className="mk-time">{timeLabel(m.startTime)} – {timeLabel(m.endTime)}</span>
+                        <small>{durationText(m.startTime, m.endTime) ?? `${m.hours}h`}</small>
+                      </td>
+                      <td>
+                        <span className="mk-class"><b>{m.sectionCode}</b> {m.subjectCode}</span>
+                        <span className="mk-class-title">{m.subjectTitle}</span>
+                        <small>{m.faculty ?? "No faculty assigned"}</small>
+                      </td>
+                      <td><span className="mk-lab">{m.roomCode}</span></td>
+                      <td className="mk-reason">{m.reason ? <span title={m.reason}>{m.reason}</span> : <span className="mk-muted">—</span>}</td>
+                      <td>
+                        <button type="button" className="mk-attach" onClick={() => openAttachment(m)} disabled={opening} title={m.attachmentName}>
+                          <FileText size={13} /> <span>{m.attachmentName}</span>
+                        </button>
+                        <small>by {m.createdBy}</small>
+                      </td>
+                      <td><SessionBadge session={m.session} /></td>
+                      <td className="mk-actions">
+                        <button type="button" className="mk-icon-btn" aria-label={`View make-up class ${m.sectionCode} on ${dateLabel(m.date)}`} onClick={() => setSelectedId(m.makeUpId)}>
+                          <Eye size={15} />
+                        </button>
+                        {!m.session && (
+                          <button type="button" className="mk-icon-btn is-danger" title="Remove" aria-label={`Remove make-up class ${m.sectionCode} on ${dateLabel(m.date)}`} disabled={busy} onClick={() => remove(m)}>
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {listState === "ready" && list.length > 0 && (
+          <footer className="mk-card-foot">
+            Showing {rows.length} of {list.length}. Saving a make-up class does not credit hours; they count after the session's final confirmation.
+          </footer>
+        )}
+      </section>
+
+      {showForm && (
+        <MakeUpForm
+          sections={sections}
+          sectionsFailed={sectionsFailed}
+          labs={labs}
+          existing={list}
+          busy={busy}
+          error={formError}
+          onSave={save}
+          onCancel={() => { if (!busyRef.current) { setShowForm(false); setFormError(null); } }}
+        />
+      )}
+
+      {selected && !showForm && (
+        <MakeUpDetails
+          item={selected}
+          busy={busy}
+          opening={opening}
+          onOpenAttachment={() => openAttachment(selected)}
+          onRemove={() => remove(selected)}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
+    </div>
   );
 }

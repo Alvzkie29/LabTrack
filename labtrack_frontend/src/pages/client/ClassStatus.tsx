@@ -1,316 +1,189 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { Wand2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Building2, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Info, Loader2, RefreshCw, Wand2 } from "lucide-react";
 import { useRole } from "@/contexts/RoleContext";
-import { getLaboratories, type LaboratorySummary } from "@/api/laboratories";
-import { getAcademicYears, semesterName, type AcademicYear } from "@/api/academicYears";
+import { useAuth } from "@/contexts/AuthContext";
+import { getLaboratories } from "@/api/laboratories";
+import { getAcademicYears, semesterName } from "@/api/academicYears";
+import { getCourseSections } from "@/api/courseSections";
+import { getMakeUpClasses } from "@/api/makeUpClasses";
+import { getStatusWeek, markStatus, type StatusWeek } from "@/api/sessionStatus";
 import { termWeeks } from "@/utils/termWeeks";
-import { getStatusWeek, markStatus, type StatusWeek, type StatusRow, type StatusCell } from "@/api/sessionStatus";
 import { ApiError } from "@/api/client";
+import { snackbar } from "@/utils/snackbar";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { ClassStatusCalendar } from "@/components/class-status/ClassStatusCalendar";
+import { MeetingInspector } from "@/components/class-status/MeetingInspector";
+import { addDays, calendarMeetings, fromIso, manilaToday, mondayOf, toIso, type CalendarMeeting } from "@/components/class-status/calendar-data";
+import "./class-status.css";
 
-const MUTED = "#57606a";
-const BORDER = "#d1d9e0";
-const MAROON = "#800000";
-const GOLD = "#F4C430";
-
-// ---------- dates (local, no time zone shifts) ----------
-const pad = (n: number) => String(n).padStart(2, "0");
-const toIso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const fromIso = (s: string) => { const [y, m, d] = s.slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); };
-const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-const mondayOf = (d: Date) => addDays(d, -((d.getDay() + 6) % 7));
-const short = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
-
-const timeLabel = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
-  return `${((h + 11) % 12) + 1}:${pad(m)} ${h >= 12 ? "PM" : "AM"}`;
-};
-
-const SHIFTS: StatusRow["shift"][] = ["Morning", "Afternoon", "Evening"];
-
+const failure = (error: unknown, fallback: string) => error instanceof ApiError ? error.message : fallback;
 export function ClassStatusPage() {
-  const { role } = useRole();
-  const allowed = role === "Custodian" || role === "Administrator" || role === "LabAssistant";
-
-  const [labs, setLabs] = useState<LaboratorySummary[]>([]);
-  const [years, setYears] = useState<AcademicYear[]>([]);
-  const [labId, setLabId] = useState<number | "">("");
-  const [ayId, setAyId] = useState<number | "">("");
-  const [weekStart, setWeekStart] = useState("");
-
-  const [week, setWeek] = useState<StatusWeek | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { role } = useRole(); const { user } = useAuth(); const allowed = role === "Custodian" || role === "Administrator" || role === "LabAssistant";
+  const client = useQueryClient(); const prefix = ["class-status-calendar", user?.userId, role];
+  const [selectedLab, setSelectedLab] = useState<number | null>(null); const [selectedPeriod, setSelectedPeriod] = useState<number | null>(null);
+  const [weekStart, setWeekStart] = useState(""); const [view, setView] = useState<"week" | "day">("week"); const [day, setDay] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null); const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null);
+  const [busy, setBusy] = useState<"manual" | "suggestions" | null>(null); const lock = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const labsQuery = useQuery({ queryKey: [...prefix, "laboratories"], queryFn: getLaboratories, enabled: allowed, staleTime: 60_000, retry: false });
+  const yearsQuery = useQuery({ queryKey: [...prefix, "academic-periods"], queryFn: getAcademicYears, enabled: allowed, staleTime: 60_000, retry: false });
+  const labs = labsQuery.data ?? []; const years = yearsQuery.data ?? [];
+  const labId = selectedLab ?? labs[0]?.labId; const lab = labs.find(l => l.labId === labId);
+  const ayId = selectedPeriod ?? (years.find(y => y.isActive) ?? years[0])?.ayId; const ay = years.find(y => y.ayId === ayId);
+  const weeks = useMemo(() => ay ? termWeeks(ay, 4) : [], [ay]);
+  const today = manilaToday(); const currentIso = toIso(mondayOf(fromIso(today)));
+  useEffect(() => { if (!weeks.length) { setWeekStart(""); return; } setWeekStart(current => weeks.some(w => w.iso === current) ? current : weeks.some(w => w.iso === currentIso) ? currentIso : currentIso < weeks[0].iso ? weeks[0].iso : weeks[weeks.length - 1].iso); }, [weeks, currentIso]);
+  const weekIndex = weeks.findIndex(w => w.iso === weekStart); const chosenWeek = weeks[weekIndex]; const ready = allowed && !!lab && !!ay && weekIndex >= 0;
+  const weekKey = [...prefix, "week", labId, ayId, weekStart];
+  const weekQuery = useQuery({ queryKey: weekKey, queryFn: () => getStatusWeek(labId!, ayId!, weekStart), enabled: ready, staleTime: 30_000, retry: false });
+  const schedulesQuery = useQuery({ queryKey: [...prefix, "schedule-times", labId, ayId], queryFn: () => getCourseSections({ labId, ayId }), enabled: allowed && !!lab && !!ay, staleTime: 60_000, retry: false });
+  const makeUpsQuery = useQuery({ queryKey: [...prefix, "make-up-times", ayId], queryFn: () => getMakeUpClasses(ayId), enabled: allowed && !!ay, staleTime: 60_000, retry: false });
+  const week = ready ? weekQuery.data ?? null : null;
+  const meetings = useMemo(() => calendarMeetings(week, schedulesQuery.isError ? undefined : schedulesQuery.data, makeUpsQuery.isError ? undefined : makeUpsQuery.data), [week, schedulesQuery.data, schedulesQuery.isError, makeUpsQuery.data, makeUpsQuery.isError]);
+  const selectedMeeting = selectedId ? meetings.find(m => m.id === selectedId) ?? null : null;
+  useEffect(() => { setSelectedId(null); setError(null); }, [labId, ayId, weekStart]);
+  useEffect(() => { if (week) setDay(current => week.days.includes(current) ? current : week.days.includes(today) ? today : week.days[0] ?? ""); }, [week?.weekStart, today]);
+  const suggestionsLeft = week ? week.rows.reduce((n, row) => n + row.cells.filter(c => c.meets && !c.status && c.suggestion && c.source !== "confirmation").length, 0) : 0;
+  const pastMeetings = week?.rows.reduce((n, row) => n + row.cells.filter(c => c.meets && c.date < today).length, 0) ?? 0;
+  const pendingFinal = week?.rows.reduce((n, row) => n + row.cells.filter(c => c.meets && c.source === "confirmation" && c.awaitingFinal).length, 0) ?? 0;
+  function openMeeting(meeting: CalendarMeeting, element: HTMLElement) { setSelectedId(meeting.id); setReturnFocus(element); setError(null); }
 
-  useEffect(() => {
-    if (!allowed) return;
-    getLaboratories().then((ls) => { setLabs(ls); setLabId((c) => c || ls[0]?.labId || ""); }).catch(() => setLabs([]));
-    getAcademicYears().then((ys) => {
-      setYears(ys);
-      setAyId((c) => c || (ys.find((y) => y.isActive) ?? ys[0])?.ayId || "");
-    }).catch(() => setYears([]));
-  }, [allowed]);
-
-  const ay = years.find((y) => y.ayId === ayId);
-
-  const weeks = useMemo(() => (ay ? termWeeks(ay, 4) : []), [ay]);
-
-  // Default to this week (on a Sunday, the week that just ended), kept inside the term.
-  useEffect(() => {
-    if (weeks.length === 0) return;
-    const current = toIso(mondayOf(new Date()));
-    setWeekStart(weeks.some((w) => w.iso === current) ? current : current < weeks[0].iso ? weeks[0].iso : weeks[weeks.length - 1].iso);
-  }, [weeks]);
-
-  const load = () => {
-    if (!labId || !ayId || !weekStart) return Promise.resolve();
-    setLoading(true);
-    return getStatusWeek(Number(labId), Number(ayId), weekStart)
-      .then(setWeek)
-      .catch((e) => { setWeek(null); setError(e instanceof ApiError ? e.message : "Could not load the week."); })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { setError(null); setMessage(null); load(); }, [labId, ayId, weekStart]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!allowed) {
-    return <div className="py-24 text-center text-[13px]" style={{ color: MUTED }}>This page is only available to laboratory staff.</div>;
-  }
-
-  /** Save one cell, then update it in place so the grid does not jump. */
-  const save = async (row: StatusRow, cell: StatusCell, status: string, note?: string) => {
-    setError(null);
-    setMessage(null);
+  async function save(meeting: CalendarMeeting, status: string, note?: string) {
+    if (lock.current || !week || meeting.cell.source === "confirmation") return false;
+    lock.current = true; setBusy("manual"); setError(null);
     try {
-      const r = await markStatus({ sectionId: row.sectionId, sessionDate: cell.date, status, note });
-      setWeek((w) => {
-        if (!w) return w;
-        const wasUnmarked = cell.status === null && cell.suggestion !== null;
-        const nowUnmarked = r.status === null && cell.suggestion !== null;
-        return {
-          ...w,
-          unmarked: w.unmarked + (nowUnmarked ? 1 : 0) - (wasUnmarked ? 1 : 0),
-          rows: w.rows.map((x) => x.sectionId !== row.sectionId ? x : {
-            ...x,
-            cells: x.cells.map((c) => c.date !== cell.date ? c : {
-              ...c, status: r.status, note: r.note, source: r.status ? "marked" : null,
-            }),
-          }),
-        };
-      });
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not save that status.");
-    }
-  };
-
-  /** Accept every suggestion this week in one go. */
-  const fillSuggestions = async () => {
-    if (!week) return;
-    const todo = week.rows.flatMap((r) => r.cells.filter((c) => c.meets && !c.status && c.suggestion).map((c) => ({ r, c })));
-    setBusy(true);
-    setError(null);
-    let saved = 0;
-    for (const { r, c } of todo) {
-      try { await markStatus({ sectionId: r.sectionId, sessionDate: c.date, status: c.suggestion! }); saved++; }
-      catch { /* reported below by what is still unmarked */ }
-    }
-    await load();
-    setBusy(false);
-    setMessage(`${saved} of ${todo.length} suggestion${todo.length === 1 ? "" : "s"} saved. Change any that are wrong, for example to Fieldwork or On Leave.`);
-  };
-
-  const suggestionsLeft = week ? week.rows.reduce((n, r) => n + r.cells.filter((c) => c.meets && !c.status && c.suggestion).length, 0) : 0;
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <div className="font-mono text-[11px] uppercase tracking-wider" style={{ color: MUTED }}>Monitoring</div>
-        <h1 className="mt-1" style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4 }}>Class Status</h1>
-        <p className="mt-0.5 max-w-3xl text-[13px]" style={{ color: MUTED }}>
-          Every lab meeting of the week, Monday to Friday. <b>On-site</b> comes from the session confirmation and
-          cannot be picked by hand. For a meeting with no confirmation, mark why it was not held. Complete the week by
-          Friday or Saturday; the weekly report's remarks come from here.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-end gap-3">
-        <Pick label="Laboratory">
-          <select value={labId} onChange={(e) => setLabId(e.target.value ? Number(e.target.value) : "")} className={SELECT} style={{ border: `1px solid ${BORDER}` }}>
-            {labs.map((l) => <option key={l.labId} value={l.labId}>{l.roomCode} — {l.name}</option>)}
-          </select>
-        </Pick>
-        <Pick label="Term">
-          <select value={ayId} onChange={(e) => setAyId(e.target.value ? Number(e.target.value) : "")} className={SELECT} style={{ border: `1px solid ${BORDER}` }}>
-            {years.map((y) => <option key={y.ayId} value={y.ayId}>{semesterName(y)}{y.isActive ? " (active)" : ""}</option>)}
-          </select>
-        </Pick>
-        <Pick label="Week">
-          <select value={weekStart} onChange={(e) => setWeekStart(e.target.value)} className={SELECT} style={{ border: `1px solid ${BORDER}` }}>
-            {weeks.map((w) => <option key={w.iso} value={w.iso}>{w.label}</option>)}
-          </select>
-        </Pick>
-        <button type="button" onClick={fillSuggestions} disabled={busy || suggestionsLeft === 0}
-          className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium"
-          style={{ background: MAROON, color: GOLD, opacity: busy || suggestionsLeft === 0 ? 0.6 : 1 }}>
-          <Wand2 className="size-3.5" /> {busy ? "Saving..." : `Use the ${suggestionsLeft} suggestion${suggestionsLeft === 1 ? "" : "s"}`}
-        </button>
-      </div>
-
-      {week && (
-        <div className="rounded-md px-3 py-2 text-[12.5px]"
-          style={week.unmarked > 0
-            ? { background: "#fff8e6", color: "#7a5900", border: "1px solid #f0d9a0" }
-            : { background: "#eef8f0", color: "#1a7f37", border: "1px solid #b8e0c2" }}>
-          {week.unmarked > 0
-            ? `${week.unmarked} past meeting${week.unmarked === 1 ? "" : "s"} this week still need${week.unmarked === 1 ? "s" : ""} a status.`
-            : "Every past meeting this week has a status."}
-        </div>
-      )}
-      {error && <div className="text-[12.5px]" style={{ color: "#b42318" }}>{error}</div>}
-      {message && <div className="text-[12.5px]" style={{ color: "#1a7f37" }}>{message}</div>}
-
-      {week && (
-        <div className="overflow-x-auto" style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
-          <table className="w-full min-w-[1100px] text-[12px]">
-            <thead>
-              <tr style={{ background: "#f6f8fa", color: MUTED }}>
-                {["Time", "Faculty", "Code", "Course", "Students"].map((h, i) => (
-                  <th key={h} className={`py-2.5 pr-3 text-left font-mono text-[10.5px] uppercase tracking-wider ${i === 0 ? "pl-4" : ""}`}>{h}</th>
-                ))}
-                {week.days.map((d) => (
-                  <th key={d} className="w-[150px] py-2.5 pr-2 text-left font-mono text-[10.5px] uppercase tracking-wider">
-                    {fromIso(d).toLocaleDateString("en-US", { weekday: "short" })} {short(fromIso(d))}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {SHIFTS.map((shift) => {
-                const rows = week.rows.filter((r) => r.shift === shift);
-                if (rows.length === 0) return null;
-                return (
-                  <Fragment key={shift}>
-                    <tr>
-                      <td colSpan={5 + week.days.length} className="py-1.5 pl-4 font-mono text-[10.5px] font-semibold uppercase tracking-wider"
-                        style={{ background: "#fbeeee", color: MAROON, borderTop: "1px solid #e1e4e8" }}>
-                        {shift}
-                      </td>
-                    </tr>
-                    {rows.map((r) => (
-                      <tr key={r.sectionId} style={{ borderTop: "1px solid #e1e4e8" }}>
-                        <td className="whitespace-nowrap py-2 pl-4 pr-3 align-top font-mono text-[11px]">{timeLabel(r.startTime)}–{timeLabel(r.endTime)}</td>
-                        <td className="py-2 pr-3 align-top" style={{ color: r.faculty ? undefined : MAROON }}>{r.faculty ?? "Unassigned"}</td>
-                        <td className="py-2 pr-3 align-top font-mono text-[11.5px]" style={{ color: MAROON, fontWeight: 600 }}>{r.sectionCode}</td>
-                        <td className="py-2 pr-3 align-top font-mono text-[11.5px]" title={r.subjectTitle}>{r.subjectCode}</td>
-                        <td className="py-2 pr-3 align-top font-mono text-[11.5px]">{r.students}</td>
-                        {r.cells.map((c) => (
-                          <td key={c.date} className="py-1.5 pr-2 align-top">
-                            <Cell cell={c} statuses={week.statuses} onSave={(s, n) => save(r, c, s, n)} />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </Fragment>
-                );
-              })}
-              {week.rows.length === 0 && (
-                <tr><td colSpan={5 + week.days.length} className="py-8 text-center text-[13px]" style={{ color: MUTED }}>
-                  No classes meet in this laboratory this term.
-                </td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {!week && !error && <div className="py-12 text-center text-[13px]" style={{ color: MUTED }}>{loading ? "Loading..." : "Choose a laboratory, term and week."}</div>}
-    </div>
-  );
-}
-
-const SELECT = "rounded-md bg-white px-2.5 py-1.5 text-[12.5px] outline-none";
-
-function Pick({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block font-mono text-[10px] uppercase tracking-wider" style={{ color: MUTED }}>{label}</span>
-      {children}
-    </label>
-  );
-}
-
-/** One day of one class: read-only when it comes from a confirmation, a dropdown otherwise. */
-function Cell({ cell, statuses, onSave }: {
-  cell: StatusCell;
-  statuses: string[];
-  onSave: (status: string, note?: string) => Promise<void>;
-}) {
-  const [noteFor, setNoteFor] = useState<string | null>(null); // "Others" chosen, note being typed
-  const [note, setNote] = useState("");
-
-  if (!cell.meets) return <div className="h-7 rounded" style={{ background: "#f6f8fa" }} />;
-
-  const makeUpTag = cell.makeUp && (
-    <div className="mb-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-wider" style={{ color: MAROON }}>Make-up class</div>
-  );
-
-  if (cell.source === "confirmation") {
-    const virtual = cell.status === "Virtual";
-    return (
-      <div>
-        {makeUpTag}
-        <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold"
-          style={virtual ? { background: "#e7f1fb", color: "#0b5cad" } : { background: "#e5f4e4", color: "#1a7f37" }}>
-          {cell.status}
-        </span>
-        {cell.awaitingFinal && <div className="mt-0.5 text-[10.5px]" style={{ color: "#9a6700" }}>awaiting final confirmation</div>}
-      </div>
-    );
+      const result = await markStatus({ sectionId: meeting.row.sectionId, sessionDate: meeting.cell.date, status, note });
+      // Update only the existing section/date record; all same-day meeting cards share it.
+      client.setQueryData<StatusWeek>(weekKey, current => current ? { ...current, rows: current.rows.map(row => row.sectionId !== meeting.row.sectionId ? row : { ...row, cells: row.cells.map(cell => cell.date !== meeting.cell.date ? cell : { ...cell, status: result.status, note: result.note ?? null, source: result.status ? "marked" : null }) }) } : current);
+      const refreshed = await weekQuery.refetch();
+      snackbar.success(status ? "Class status saved. The existing Weekly Report uses this record." : "Manual status cleared.");
+      if (refreshed.isError) setError("The status was saved, but the week could not be refreshed. Reload to verify the latest weekly completion count.");
+      return true;
+    } catch (e) { snackbar.error(failure(e, "Could not save that status.")); return false; }
+    finally { lock.current = false; setBusy(null); }
   }
-
-  const unmarked = !cell.status && cell.suggestion;
-
-  return (
-    <div>
-      {makeUpTag}
-      <select
-        value={noteFor ?? cell.status ?? ""}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (v === "Others") { setNoteFor(v); setNote(cell.status === "Others" ? cell.note ?? "" : ""); return; }
-          setNoteFor(null);
-          onSave(v);
-        }}
-        className="w-full rounded px-1.5 py-1 text-[11.5px] outline-none"
-        style={{ border: `1px solid ${unmarked ? "#d4a72c" : BORDER}`, background: "#fff", color: cell.status ? "#0d1117" : MUTED }}
-        title={cell.suggestion ? `Suggested: ${cell.suggestion}` : undefined}
-      >
-        <option value="">—</option>
-        {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
-      </select>
-
-      {unmarked && noteFor === null && (
-        <button type="button" onClick={() => onSave(cell.suggestion!)} title="Use this suggestion"
-          className="mt-0.5 block text-left text-[10.5px] leading-tight hover:underline" style={{ color: "#9a6700" }}>
-          Suggested: {cell.suggestion}
-        </button>
-      )}
-
-      {cell.status === "Others" && cell.note && noteFor === null && (
-        <div className="mt-0.5 truncate text-[10.5px]" style={{ color: MUTED }} title={cell.note}>{cell.note}</div>
-      )}
-
-      {noteFor === "Others" && (
-        <div className="mt-1 flex gap-1">
-          <input autoFocus value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Reason"
-            onKeyDown={(e) => { if (e.key === "Enter" && note.trim()) { onSave("Others", note.trim()); setNoteFor(null); } if (e.key === "Escape") setNoteFor(null); }}
-            className="w-full rounded px-1.5 py-0.5 text-[11px] outline-none" style={{ border: `1px solid ${MAROON}` }} />
-          <button type="button" disabled={!note.trim()} onClick={() => { onSave("Others", note.trim()); setNoteFor(null); }}
-            className="rounded px-1.5 text-[11px] font-semibold" style={{ background: MAROON, color: GOLD, opacity: note.trim() ? 1 : 0.5 }}>
-            Save
-          </button>
+  async function fillSuggestions() {
+    if (!week || lock.current) return;
+    const todo = week.rows.flatMap(row => row.cells.filter(cell => cell.meets && !cell.status && cell.suggestion && cell.source !== "confirmation").map(cell => ({ row, cell })));
+    if (!todo.length) return;
+    lock.current = true; setBusy("suggestions"); setError(null); let saved = 0;
+    try {
+      for (const { row, cell } of todo) { try { await markStatus({ sectionId: row.sectionId, sessionDate: cell.date, status: cell.suggestion! }); saved++; } catch {/* Preserve independent attempts; the refreshed backend count shows what remains. */ } }
+      const refreshed = await weekQuery.refetch();
+      snackbar[saved === todo.length ? "success" : "warning"](`${saved} of ${todo.length} suggestion${todo.length === 1 ? "" : "s"} saved. Change any that are wrong, for example to Fieldwork or On Leave.`);
+      if (refreshed.isError) setError("Suggestion attempts finished, but the week could not be refreshed. Reload to verify the saved records.");
+    } finally { lock.current = false; setBusy(null); }
+  }
+  if (!allowed) return <div className="cs-restricted">
+    <CalendarDays size={27} />
+    <h1>Class Status is restricted</h1>
+    <p>This page is only available to laboratory staff.</p>
+  </div>;
+  const setupLoading = labsQuery.isPending || yearsQuery.isPending;
+  const timeLoading = ready && (schedulesQuery.isPending || makeUpsQuery.isPending);
+  const loading = setupLoading || ready && weekQuery.isPending || timeLoading;
+  const dateRange = weekStart ? new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).formatRange(fromIso(weekStart), addDays(fromIso(weekStart), 4)) : "Select an academic week";
+  return <div className="cs-page">
+    <header className="cs-heading">
+      <div>
+        <p className="cs-eyebrow">LABORATORY MONITORING / WEEKLY CALENDAR</p>
+        <h1>Class Status</h1>
+        <p>Monitor scheduled laboratory meetings and complete weekly class status records.</p>
+      </div>
+      <button className="cs-refresh" aria-label="Refresh class status" disabled={!!busy || setupLoading || weekQuery.isFetching} onClick={() => void client.invalidateQueries({ queryKey: prefix })}>
+        <RefreshCw size={15} className={weekQuery.isFetching ? "cs-spin" : ""} />
+        <span>Refresh</span>
+      </button>
+    </header>
+    <section className="cs-workspace" aria-label="Weekly laboratory calendar">
+      <div className="cs-toolbar">
+        <SearchableSelect ariaLabel="Class status laboratory" value={labId ? String(labId) : ""} onValueChange={value => setSelectedLab(Number(value))} disabled={!!busy || labsQuery.isPending || labsQuery.isError} placeholder={labsQuery.isPending ? "Loading laboratories…" : "Choose laboratory"} leadingIcon={<Building2 size={15} />} options={labs.map(l => ({ value: String(l.labId), label: l.name, description: l.roomCode }))} />
+        <SearchableSelect ariaLabel="Class status academic period" value={ayId ? String(ayId) : ""} onValueChange={value => { setSelectedPeriod(Number(value)); setWeekStart(""); }} disabled={!!busy || yearsQuery.isPending || yearsQuery.isError} placeholder={yearsQuery.isPending ? "Loading academic periods…" : "Choose academic period"} options={years.map(y => ({ value: String(y.ayId), label: semesterName(y), description: y.isActive ? "Active academic period" : "Registered academic period" }))} />
+        <SearchableSelect ariaLabel="Class status week" value={weekStart} onValueChange={setWeekStart} disabled={!!busy || !weeks.length} placeholder="Choose week" searchPlaceholder="Search term, week or dates…" options={weeks.map(w => ({ value: w.iso, label: `${w.term} · Week ${w.number}`, description: w.label }))} />
+        <button className="cs-primary cs-suggestions" onClick={() => void fillSuggestions()} disabled={!!busy || !week || weekQuery.isFetching || suggestionsLeft === 0}>{busy === "suggestions" ? <Loader2 size={15} className="cs-spin" /> : <Wand2 size={15} />}Use Suggestions{week && <span>{suggestionsLeft}</span>}</button>
+      </div>
+      <div className="cs-week-toolbar">
+        <div className="cs-week-title">
+          <h2>{dateRange}</h2>
+          <p>{lab?.name ?? "No laboratory selected"}{chosenWeek ? ` · ${chosenWeek.term} · Week ${chosenWeek.number}` : ""}</p>
         </div>
-      )}
-    </div>
-  );
+        <div className="cs-week-actions">
+          <div className="cs-week-arrows">
+            <button aria-label="Previous academic week" disabled={!!busy || weekIndex <= 0} onClick={() => setWeekStart(weeks[weekIndex - 1].iso)}>
+              <ChevronLeft size={16} />
+            </button>
+            <button aria-label="Next academic week" disabled={!!busy || weekIndex < 0 || weekIndex >= weeks.length - 1} onClick={() => setWeekStart(weeks[weekIndex + 1].iso)}>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          <button className="cs-current-week" disabled={!!busy || !weeks.some(w => w.iso === currentIso) || weekStart === currentIso} onClick={() => setWeekStart(currentIso)} title={weeks.some(w => w.iso === currentIso) ? "Show current week" : "The current week is outside this academic period"}>Current Week</button>
+          <div className="cs-view-switch" aria-label="Calendar view">
+            <button className={view === "week" ? "is-active" : ""} aria-pressed={view === "week"} onClick={() => setView("week")}>Week</button>
+            <button className={view === "day" ? "is-active" : ""} aria-pressed={view === "day"} onClick={() => setView("day")}>Day</button>
+          </div>
+        </div>
+      </div>
+      <div className="cs-completion-row">{week && !weekQuery.isFetching && !weekQuery.isError ? <>
+        <span className={`cs-week-completion ${week.unmarked > 0 ? "is-incomplete" : pastMeetings > 0 ? "is-complete" : ""}`}>{week.unmarked > 0 ? <Info size={14} /> : pastMeetings > 0 ? <CheckCircle2 size={14} /> : <CalendarDays size={14} />} {!meetings.length ? "No scheduled meetings this week" : week.unmarked > 0 ? `${week.unmarked} past meeting${week.unmarked === 1 ? " still requires" : "s still require"} a status` : pastMeetings > 0 ? "All eligible past meetings have a status" : "No past meetings to review"}</span>{pendingFinal > 0 && <span className="cs-pending-count">{pendingFinal} awaiting final confirmation</span>}</> : <span className="cs-week-completion">{loading || weekQuery.isFetching ? "Loading weekly status…" : "Weekly completion unavailable"}</span>}<span className="cs-local-time">Philippine time · Monday–Friday</span>
+      </div>
+      {(labsQuery.isError || yearsQuery.isError) && <div className="cs-notice is-error" role="alert">
+        <AlertTriangle size={15} />
+        <span>{labsQuery.isError ? "Laboratories could not be loaded." : "Academic periods could not be loaded."}</span>
+        <button onClick={() => { void labsQuery.refetch(); void yearsQuery.refetch(); }}>Try again</button>
+      </div>}
+      {weekQuery.isError && ready && <div className="cs-notice is-error" role="alert">
+        <AlertTriangle size={15} />
+        <span>{failure(weekQuery.error, "Could not load the week.")}</span>
+        <button disabled={!!busy} onClick={() => void weekQuery.refetch().then((result) => { if (!result.isError) setError(null); })}>Reload week</button>
+      </div>}
+      {(schedulesQuery.isError || makeUpsQuery.isError) && ready && <div className="cs-notice is-warning" role="alert">
+        <Info size={15} />
+        <span>Some meeting times could not be loaded. Status records are preserved and meetings with unknown times are listed separately.</span>
+        <button disabled={!!busy} onClick={() => { void schedulesQuery.refetch(); void makeUpsQuery.refetch(); }}>Reload meeting times</button>
+      </div>}
+      {error && <div className="cs-notice is-error" role="alert">
+        <AlertTriangle size={15} />
+        <span>{error}</span>
+        <button disabled={!!busy} onClick={() => void weekQuery.refetch().then((result) => { if (!result.isError) setError(null); })}>Reload week</button>
+      </div>}
+      {loading ? <div className="cs-calendar-loading" role="status">
+        <div className="cs-calendar-skeleton">{Array.from({ length: 5 }, (_, i) =>
+          <div key={i} />)}</div>
+        <span>
+          <Loader2 size={15} className="cs-spin" />Loading scheduled meetings…</span>
+      </div> : !lab ? <div className="cs-page-state">
+        <Building2 size={29} />
+        <h3>{labs.length ? "Select a laboratory" : "No laboratories available"}</h3>
+        <p>Select a registered laboratory to review its class meetings.</p>
+      </div> : !ay || !weeks.length ? <div className="cs-page-state">
+        <CalendarDays size={29} />
+        <h3>No applicable academic period</h3>
+        <p>A registered academic period with valid dates is needed to display its weeks.</p>
+      </div> : !week ? <div className="cs-page-state">
+        <CalendarDays size={29} />
+        <h3>Weekly records unavailable</h3>
+        <p>Choose a week or reload the status records to continue.</p>
+      </div> : !week.days.length ? <div className="cs-page-state">
+        <CalendarDays size={29} />
+        <h3>Calendar dates unavailable</h3>
+        <p>The weekly response did not include calendar dates.</p>
+      </div> : !meetings.length ? <div className="cs-page-state">
+        <CalendarDays size={30} />
+        <h3>No scheduled laboratory meetings</h3>
+        <p>No Monday-to-Friday meetings were returned for this laboratory and academic week.</p>
+      </div> : <ClassStatusCalendar week={week} meetings={meetings} selectedId={selectedId} onSelect={openMeeting} day={day} onDayChange={setDay} view={view} today={today} />}
+      <footer className="cs-calendar-footer">
+        <div className="cs-status-legend" aria-label="Status color guide">
+          <span className="is-onsite">On-site</span>
+          <span className="is-virtual">Virtual</span>
+          <span className="is-pending">Awaiting final</span>
+          <span className="is-marked">Manual reason</span>
+          <span className="is-unmarked">Unmarked</span>
+        </div>
+        <span>On-site and Virtual come from session confirmations.</span>
+      </footer>
+    </section>
+    <MeetingInspector meeting={selectedMeeting} week={week} academicYearId={ayId} busy={!!busy} error={error} today={today} onClose={() => setSelectedId(null)} returnFocus={returnFocus} onSave={save} />
+  </div>;
 }

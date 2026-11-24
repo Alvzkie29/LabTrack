@@ -1,0 +1,1009 @@
+/* CHED Compliance Report — page-scoped styles (LabTrack maroon/gold, warm neutrals) */
+.ched-page {
+  --ched-gutter: 1rem;
+  --ched-ok: #3f7d4a;
+  --ched-ok-bg: #ebf4ec;
+  --ched-risk: #a06b12;
+  --ched-risk-bg: #fdf3dc;
+  --ched-non: #a2373c;
+  --ched-non-bg: #f9ebe9;
+  --ched-none: #b9aab2;
+  width: calc(100% + 2 * var(--ched-gutter));
+  margin: 0 calc(-1 * var(--ched-gutter));
+  font-size: 13px;
+  color: #0d1117;
+}
+@media (min-width: 768px) {
+  .ched-page {
+    --ched-gutter: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .ched-page {
+    --ched-gutter: 2rem;
+  }
+}
+
+/* ── Heading ─────────────────────────────────────────── */
+.ched-heading {
+  margin-bottom: 20px;
+}
+.ched-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #856b76;
+  text-transform: uppercase;
+  line-height: 1.7;
+}
+.ched-heading h1 {
+  margin: 6px 0;
+  font-size: clamp(27px, 2.3vw, 33px);
+  line-height: 1.2;
+  font-weight: 550;
+  letter-spacing: -1px;
+}
+.ched-heading > p:last-child {
+  max-width: 720px;
+  font-size: 13px;
+  color: #57606a;
+  line-height: 1.7;
+}
+.ched-print-only {
+  display: none;
+}
+
+/* ── Toolbar (sits on the page, above the workspace) ─── */
+.ched-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.ched-filters {
+  display: grid;
+  grid-template-columns: 190px 220px minmax(240px, 290px);
+  gap: 10px;
+  min-width: 0;
+}
+.ched-filters > [role="combobox"] {
+  width: 100%;
+  height: 38px;
+  font-size: 12px;
+  box-shadow: none;
+  background: #fffdfb;
+}
+.ched-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.ched-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #dfd5cd;
+  border-radius: 10px;
+  background: #fffdfa;
+  color: #800000;
+  font-size: 12px;
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    filter 0.15s;
+}
+.ched-btn:hover:not(:disabled) {
+  background: #f6efe8;
+}
+.ched-btn.is-primary {
+  background: #800000;
+  border-color: #800000;
+  color: #fff;
+}
+.ched-btn.is-primary:hover:not(:disabled) {
+  background: #800000;
+  filter: brightness(1.12);
+}
+.ched-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Layout + workspace ──────────────────────────────── */
+.ched-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.ched-layout.has-inspector {
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+.ched-workspace {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #ebe3da;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px #39252b08;
+}
+
+/* ── Overview strip ──────────────────────────────────── */
+.ched-overview {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #efe8e1;
+  background: #fffdfb;
+}
+.ched-overview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.ched-overview-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ched-overview h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #4e3d47;
+}
+.ched-overview h2 strong {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: #800000;
+}
+.ched-overview-scope {
+  font-size: 11px;
+  color: #9b8591;
+}
+.ched-muted {
+  font-size: 11px;
+  color: #9b8591;
+}
+.ched-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 0;
+  font-size: 11.5px;
+  color: #6f5a66;
+}
+.ched-legend li + li {
+  margin-left: 14px;
+  padding-left: 14px;
+  border-left: 1px solid #e9e1da;
+}
+.ched-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ched-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.ched-legend b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: #0d1117;
+}
+.ched-legend .is-ok i {
+  background: var(--ched-ok);
+}
+.ched-legend .is-risk i {
+  background: #d9a334;
+}
+.ched-legend .is-non i {
+  background: var(--ched-non);
+}
+.ched-legend .is-none i {
+  background: var(--ched-none);
+}
+.ched-overview-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ched-overview-skeleton > span:not(.sr-only) {
+  height: 12px;
+  width: 40%;
+  border-radius: 5px;
+  background: #eee5dc;
+  animation: ched-pulse 1.5s ease-in-out infinite;
+}
+.ched-overview-skeleton > span:last-child {
+  width: 25%;
+  height: 10px;
+}
+
+.ched-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 20px 0;
+  padding: 9px 12px;
+  border: 1px solid #eadabc;
+  border-radius: 9px;
+  background: #fff7e7;
+  color: #946e3b;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.ched-note svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.ched-note button {
+  margin-left: auto;
+  color: #800000;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* ── Table ───────────────────────────────────────────── */
+.ched-dim {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.ched-table-scroll {
+  max-height: calc(100dvh - 380px);
+  min-height: 280px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c4afa64d transparent;
+}
+.ched-table {
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+}
+.ched-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 11px 14px;
+  background: #faf7f4;
+  border-bottom: 1px solid #ece4dc;
+  color: #8d7785;
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.ched-table th:first-child,
+.ched-table td:first-child {
+  padding-left: 20px;
+  width: 78px;
+}
+.ched-table th:last-child,
+.ched-table td:last-child {
+  padding-right: 16px;
+  width: 48px;
+}
+.ched-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #f1ebe5;
+  vertical-align: middle;
+  font-size: 12.5px;
+}
+.ched-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.ched-table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ched-table tbody tr:hover {
+  background: #fcf9f6;
+}
+.ched-table tr.is-selected {
+  background: #fbf2ef;
+}
+.ched-table tr.is-selected td:first-child {
+  box-shadow: inset 3px 0 #800000;
+}
+.ched-table .is-num {
+  text-align: right;
+}
+.ched-th-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: help;
+}
+.ched-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: #800000;
+}
+.ched-subject {
+  display: block;
+  max-width: 300px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #2f2530;
+  cursor: pointer;
+}
+.ched-subject small {
+  display: block;
+  margin-bottom: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: #9b8591;
+}
+.ched-subject:hover {
+  color: #800000;
+}
+.ched-faculty {
+  color: #57606a;
+  white-space: nowrap;
+}
+.ched-unassigned {
+  font-style: italic;
+  font-size: 11.5px;
+  color: #a2373c;
+}
+.ched-meetings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 180px;
+}
+.ched-meetings span {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #f5f0eb;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #7a6672;
+  white-space: nowrap;
+}
+.ched-meetings b {
+  font-weight: 600;
+  color: #5b4452;
+}
+.ched-none {
+  color: #b9aab2;
+  font-size: 11.5px;
+}
+
+/* Inline verified-hours progress */
+.ched-hours {
+  min-width: 150px;
+  max-width: 190px;
+}
+.ched-hours-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #9b8591;
+  white-space: nowrap;
+}
+.ched-hours-value strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0d1117;
+}
+.ched-hours > small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #9b8591;
+}
+/* Hour completion only (confirmed ÷ required) — never coloured by compliance status. */
+.ched-bar {
+  height: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e9e4e1;
+}
+.ched-bar.is-large {
+  height: 5px;
+  margin-top: 12px;
+}
+.ched-bar > span {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: inherit;
+  background: #c99725;
+}
+.ched-remaining {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: #4e3d47;
+}
+.ched-remaining small {
+  margin-left: 1px;
+  font-size: 10.5px;
+  color: #9b8591;
+}
+
+/* Utilization */
+.ched-util {
+  min-width: 110px;
+  cursor: help;
+}
+.ched-util-value strong {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d1117;
+}
+.ched-util > small {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: #9b8591;
+  white-space: nowrap;
+}
+
+/* Status */
+.ched-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+.ched-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.ched-status.is-Compliant {
+  background: var(--ched-ok-bg);
+  color: var(--ched-ok);
+}
+.ched-status.is-AtRisk {
+  background: var(--ched-risk-bg);
+  color: var(--ched-risk);
+}
+.ched-status.is-NonCompliant {
+  background: var(--ched-non-bg);
+  color: var(--ched-non);
+}
+.ched-status.is-none {
+  background: #f3eff2;
+  color: #9b8591;
+}
+
+.ched-view {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #9b7e90;
+  cursor: pointer;
+}
+.ched-view:hover,
+.ched-view[aria-expanded="true"] {
+  color: #800000;
+  border-color: #e5d1c7;
+  background: #f6ece6;
+}
+
+/* ── States ──────────────────────────────────────────── */
+.ched-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  padding: 44px 24px;
+  text-align: center;
+  color: #af98a6;
+}
+.ched-state h3 {
+  margin-top: 15px;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+  color: #715365;
+}
+.ched-state p {
+  max-width: 460px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: #9b8391;
+}
+.ched-state button {
+  margin-top: 16px;
+  padding: 8px 13px;
+  border: 1px solid #e1d0c4;
+  border-radius: 8px;
+  background: #fffdfa;
+  color: #800000;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ched-skeleton {
+  padding: 0 20px;
+}
+.ched-skeleton > div {
+  display: grid;
+  grid-template-columns: 0.6fr 2fr 1.2fr 1fr;
+  gap: 32px;
+  align-items: center;
+  height: 62px;
+  border-bottom: 1px solid #f1ebe5;
+}
+.ched-skeleton span:not(.sr-only) {
+  height: 11px;
+  border-radius: 5px;
+  background: #eee5dc;
+  animation: ched-pulse 1.5s ease-in-out infinite;
+}
+
+.ched-footer {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  border-top: 1px solid #efe8e1;
+  background: #fffdfb;
+  font-size: 10.5px;
+  line-height: 1.7;
+  color: #a38b98;
+}
+.ched-footer span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ched-footer svg {
+  flex-shrink: 0;
+}
+.ched-mobile-list {
+  display: none;
+}
+
+/* ── Inspector ───────────────────────────────────────── */
+.ched-inspector {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #ebe3da;
+  background: #fffdfb;
+  color: #302a2c;
+}
+.ched-inspector.is-inline {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100dvh - 112px);
+  border-radius: 14px;
+}
+.ched-drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+.ched-drawer-overlay {
+  position: absolute;
+  inset: 0;
+  background: #1c111566;
+  animation: ched-fade 0.18s ease-out;
+}
+.ched-inspector.is-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(440px, 100vw);
+  height: 100%;
+  border-width: 0 0 0 1px;
+  background: #faf7f3;
+  box-shadow: -12px 0 40px #2a141a1f;
+  animation: ched-slide 0.22s ease-out;
+}
+.ched-inspector-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 20px;
+  border-bottom: 1px solid #ece3da;
+}
+.ched-inspector-heading h2 {
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.4px;
+}
+.ched-inspector-heading p:last-child:not(.ched-eyebrow) {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #9b8492;
+}
+.ched-inspector-heading .ched-eyebrow {
+  color: #800000;
+}
+.ched-inspector-heading > button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 27px;
+  height: 27px;
+  border-radius: 7px;
+  color: #9a8190;
+  cursor: pointer;
+}
+.ched-inspector-heading > button:hover {
+  background: #f1e7de;
+  color: #800000;
+}
+.ched-inspector-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 20px 22px;
+  scrollbar-width: thin;
+}
+.ched-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.ched-inspector dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+.ched-inspector dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  color: #9f8394;
+}
+.ched-inspector dd {
+  min-width: 0;
+  text-align: right;
+  font-weight: 500;
+  color: #4e3d47;
+}
+.ched-card {
+  margin-top: 16px;
+  padding: 15px;
+  border: 1px solid #ebe1d7;
+  border-radius: 11px;
+  background: #fff;
+}
+.ched-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6e5262;
+}
+.ched-card h4 svg {
+  flex-shrink: 0;
+  color: #800000;
+}
+.ched-big {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  margin-top: 12px;
+}
+.ched-big strong {
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  color: #800000;
+}
+.ched-big span {
+  font-size: 11px;
+  color: #9f8696;
+}
+.ched-card dl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid #f0e8e0;
+}
+.ched-card dd {
+  font-family: var(--font-mono);
+}
+.ched-card-note {
+  display: block;
+  margin-top: 11px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: #ab95a3;
+}
+.ched-card-empty {
+  margin-top: 10px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: #9f8696;
+}
+.ched-meeting-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 11px;
+}
+.ched-meeting-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #faf6f2;
+  font-size: 12px;
+  color: #5b4452;
+}
+.ched-meeting-list b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: #800000;
+}
+.ched-links {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #ece3da;
+}
+.ched-links a {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #800000;
+  color: #fff;
+  font-size: 11.5px;
+}
+.ched-links a:hover {
+  filter: brightness(1.12);
+}
+
+/* ── Focus + motion ──────────────────────────────────── */
+.ched-page :is(button, a, [tabindex]):focus-visible,
+.ched-inspector :is(button, a, [tabindex]):focus-visible {
+  outline: 2px solid #800000;
+  outline-offset: 3px;
+}
+@keyframes ched-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+@keyframes ched-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ched-slide {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 1279px) {
+  .ched-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ched-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ched-actions {
+    justify-content: flex-end;
+  }
+}
+@media (max-width: 767px) {
+  .ched-heading h1 {
+    font-size: 27px;
+  }
+  .ched-heading > p:last-child {
+    font-size: 12px;
+  }
+  .ched-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ched-actions > button {
+    flex: 1;
+    justify-content: center;
+  }
+  .ched-overview {
+    padding: 14px 15px;
+  }
+  .ched-table-scroll {
+    display: none;
+  }
+  .ched-mobile-list {
+    display: block;
+  }
+  .ched-mobile-row {
+    padding: 15px;
+    border-bottom: 1px solid #f1ebe5;
+  }
+  .ched-mobile-row.is-selected {
+    background: #fbf2ef;
+    box-shadow: inset 3px 0 #800000;
+  }
+  .ched-mobile-title {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 10px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .ched-mobile-title > span {
+    min-width: 0;
+  }
+  .ched-mobile-title small {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: #800000;
+  }
+  .ched-mobile-title strong {
+    display: block;
+    margin-top: 3px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #2f2530;
+  }
+  .ched-mobile-row .ched-hours {
+    max-width: none;
+  }
+  .ched-mobile-row dl {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    background: #faf6f2;
+  }
+  .ched-mobile-row dt {
+    font-size: 10px;
+    color: #a18a97;
+  }
+  .ched-mobile-row dd {
+    margin-top: 2px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #4e3d47;
+  }
+  .ched-footer {
+    padding: 12px 15px;
+  }
+  .ched-inspector.is-drawer {
+    width: 100vw;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ched-skeleton span,
+  .ched-overview-skeleton span,
+  .ched-drawer-overlay,
+  .ched-inspector.is-drawer {
+    animation: none;
+  }
+  .ched-table tbody tr {
+    transition: none;
+  }
+}
+
+/* ── Print: the table is the report ─────────────────── */
+@media print {
+  .ched-no-print {
+    display: none !important;
+  }
+  .ched-print-only {
+    display: block;
+  }
+  .ched-page {
+    width: auto;
+    margin: 0;
+    font-size: 11px;
+  }
+  .ched-heading {
+    margin-bottom: 8px;
+  }
+  .ched-heading h1 {
+    font-size: 20px;
+    letter-spacing: -0.3px;
+  }
+  .ched-print-meta {
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: #333;
+  }
+  .ched-layout {
+    display: block;
+  }
+  .ched-workspace {
+    border: 1px solid #bbb;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .ched-overview {
+    background: #fff;
+  }
+  .ched-table-scroll {
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    display: block !important;
+  }
+  .ched-table {
+    min-width: 0;
+  }
+  .ched-table th {
+    position: static;
+    background: #f2f2f2;
+    color: #333;
+  }
+  .ched-table td {
+    padding: 7px 8px;
+    font-size: 10.5px;
+  }
+  .ched-table tr {
+    break-inside: avoid;
+  }
+  .ched-dim {
+    opacity: 1;
+  }
+  .ched-bar {
+    display: none;
+  }
+  .ched-status,
+  .ched-legend i,
+  .ched-meetings span {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .ched-footer {
+    background: #fff;
+    color: #555;
+  }
+}
